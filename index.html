@@ -1,0 +1,981 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>MOSST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Sans+Extra+Condensed:ital,wght@0,500;0,600;1,400;1,500;1,600&family=PT+Mono&family=PT+Sans:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: the page is a drawing set (комплект ЕСКД). Each section is a paper sheet with a frame
+   (binding margin left 20 mm : 5 mm elsewhere), sheet 1 carries the full title block (форма 1),
+   a fixed short title block (форма 2а) at the bottom right follows the sheet in view. */
+:root {
+  --desk: #E3E8EC;      /* стол под листами */
+  --sheet: #FBFCFC;     /* ватман */
+  --ink: #161B21;       /* тушь: контуры, основной текст */
+  --ink-2: #48525D;     /* вторичный текст */
+  --line: #6B7581;      /* тонкие линии: размеры, выноски, штриховка */
+  --grid: #D6DDE3;      /* сетка и подложки */
+  --mark: #BF3527;      /* красный карандаш нормоконтроля: главные числа и отметки */
+  --f-letter: "Fira Sans Extra Condensed", "PT Sans Narrow", "Arial Narrow", sans-serif;
+  --f-text: "PT Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "PT Mono", Consolas, Menlo, monospace;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --bind: 44px;  /* поле подшивки */
+  --edge: 11px;  /* остальные поля */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #081C30; --sheet: #0F2E4F; --ink: #E6EFF6; --ink-2: #B3C7D8;
+    --line: #8DADC8; --grid: #1D4268; --mark: #F2C14E; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --desk: #081C30; --sheet: #0F2E4F; --ink: #E6EFF6; --ink-2: #B3C7D8;
+  --line: #8DADC8; --grid: #1D4268; --mark: #F2C14E; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--desk); color: var(--ink);
+  font: 400 17px/1.55 var(--f-text);
+  padding-inline: 16px; padding-block: 24px 96px;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration-color: var(--line); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--mark); }
+:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+
+/* --- лист и рамка --- */
+.set { display: grid; gap: var(--s-6); max-width: 1180px; margin-inline: auto; }
+.sheet {
+  background: var(--sheet);
+  padding: var(--edge) var(--edge) var(--edge) var(--bind);
+  box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 24px -16px rgba(10,30,50,.35);
+  position: relative; scroll-margin-top: 16px;
+}
+.frame { border: 2px solid var(--ink); position: relative; min-width: 0; }
+.frame-in { padding: var(--s-6) var(--s-6) var(--s-5); display: grid; gap: var(--s-6); min-width: 0; }
+/* графа 26 — обозначение, повёрнутое на 180° */
+.g26 {
+  position: absolute; top: -2px; left: -2px; width: 148px; height: 30px;
+  border: 2px solid var(--ink); display: grid; place-items: center;
+  font: italic 500 15px/1 var(--f-letter); letter-spacing: .04em; color: var(--ink);
+}
+.g26 span { transform: rotate(180deg); }
+/* графы на поле подшивки */
+.binding {
+  position: absolute; left: 6px; bottom: var(--edge); width: 22px;
+  display: flex; flex-direction: column-reverse; gap: 0;
+  font: italic 400 11px/1 var(--f-letter); color: var(--ink-2);
+}
+.binding div {
+  border: 1px solid var(--line); border-bottom: 0; height: 112px; display: grid; place-items: center;
+}
+.binding div:first-child { border-bottom: 1px solid var(--line); }
+.binding span { transform: rotate(-90deg); white-space: nowrap; }
+
+/* --- типографика листа --- */
+.sheet-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-4); padding-top: var(--s-4); }
+.sheet-no { font: italic 500 15px/1 var(--f-letter); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+h1, h2, h3 { font-family: var(--f-letter); font-style: italic; font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-size: clamp(64px, 11vw, 132px); letter-spacing: .01em; }
+h2 { font-size: clamp(30px, 4.2vw, 46px); }
+h3 { font-size: 24px; font-weight: 500; }
+p { margin: 0; max-width: 66ch; }
+.lead { font-size: 20px; line-height: 1.5; max-width: 60ch; }
+.muted { color: var(--ink-2); }
+.label {
+  font: italic 500 14px/1.2 var(--f-letter); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2);
+}
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.mark { color: var(--mark); }
+.formula {
+  font: 400 17px/1.6 var(--f-mono); padding: var(--s-3) var(--s-4); border-left: 1px solid var(--line);
+  overflow-x: auto; white-space: nowrap; max-width: 100%;
+}
+.formula b { font-weight: 400; color: var(--mark); }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; font: italic 500 14px/1 var(--f-letter);
+  letter-spacing: .05em; text-transform: uppercase; padding: 4px 8px 3px; border: 1px solid var(--ink);
+}
+.chip.plan { border-style: dashed; color: var(--ink-2); border-color: var(--line); }
+.chip.work { border-color: var(--mark); color: var(--mark); }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-6); }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+
+/* --- лист 1: общий вид --- */
+.hero { display: grid; gap: var(--s-4); }
+.hero .sub { font: italic 500 clamp(22px, 2.6vw, 30px)/1.2 var(--f-letter); max-width: 34ch; text-wrap: balance; }
+.path { display: flex; flex-wrap: wrap; gap: 0; margin: 0; padding: 0; list-style: none; }
+.path li {
+  display: flex; align-items: center; gap: var(--s-2); padding: 6px 14px 6px 0;
+  font: italic 500 18px/1.2 var(--f-letter);
+}
+.path li + li::before { content: "→"; color: var(--line); font-style: normal; margin-right: var(--s-2); }
+.path .todo { color: var(--ink-2); }
+.path .todo span { text-decoration: underline dashed var(--line); text-underline-offset: 4px; }
+
+.plug { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(250px, 1fr); gap: var(--s-5); align-items: start; }
+@media (max-width: 900px) { .plug { grid-template-columns: minmax(0, 1fr); } }
+.plug figure { margin: 0; min-width: 0; }
+.plug svg { width: 100%; height: auto; display: block; }
+.plug figcaption { font: italic 400 15px/1.35 var(--f-letter); color: var(--ink-2); margin-top: var(--s-2); }
+.ctl { display: grid; gap: var(--s-4); min-width: 0; }
+.ctl label { display: grid; gap: 4px; }
+.ctl .row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-2); }
+.ctl output { font: 400 18px/1 var(--f-mono); }
+input[type=range] { width: 100%; accent-color: var(--mark); }
+.seg { display: inline-flex; border: 1px solid var(--ink); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { display: block; padding: 6px 12px; cursor: pointer; font: italic 500 16px/1 var(--f-letter); }
+.seg label + input + label, .seg input + label + input + label { border-left: 1px solid var(--ink); }
+.seg input:checked + label { background: var(--ink); color: var(--sheet); }
+.seg input:focus-visible + label { outline: 2px solid var(--mark); outline-offset: 2px; }
+.readout { display: grid; grid-template-columns: auto auto; gap: 6px var(--s-4); margin: 0; align-items: baseline; }
+.readout dt { font: italic 400 16px/1.2 var(--f-letter); color: var(--ink-2); }
+.readout dd { margin: 0; text-align: right; font: 400 18px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { font-size: 15px; color: var(--ink-2); max-width: 46ch; }
+
+/* SVG чертежа */
+.dwg .thick { stroke: var(--ink); stroke-width: 2.6; fill: none; stroke-linejoin: round; }
+.dwg .thin { stroke: var(--line); stroke-width: 1.1; fill: none; }
+.dwg .axis { stroke: var(--ink); stroke-width: 1.1; stroke-dasharray: 26 5 3 5; fill: none; }
+.dwg .hidden { stroke: var(--ink); stroke-width: 1.4; stroke-dasharray: 9 5; fill: none; }
+.dwg .fan { stroke: var(--line); stroke-width: .9; fill: none; }
+.dwg .fan.last { stroke: var(--mark); stroke-width: 1.4; }
+.dwg .sonic { stroke: var(--mark); stroke-width: 1.4; fill: none; }
+.dwg .body { fill: url(#hatch); stroke: none; }
+.dwg .hl { stroke: var(--line); stroke-width: 1; }
+.dwg text { font-family: var(--f-letter); font-style: italic; font-size: 21px; fill: var(--ink); }
+.dwg text.dim { font-size: 21px; }
+.dwg text.lbl-2 { fill: var(--ink-2); font-size: 19px; }
+.dwg text.red { fill: var(--mark); }
+.dwg .arr { fill: var(--ink); }
+@media (max-width: 600px) { .dwg text.lbl-2 { display: none; } }
+
+.figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 2px solid var(--ink); }
+.figures div { padding: var(--s-4) var(--s-4) 0 0; display: grid; gap: 4px; align-content: start; }
+.figures div + div { padding-left: var(--s-4); border-left: 1px solid var(--line); }
+.figures b { font: italic 600 clamp(34px, 4vw, 48px)/1 var(--f-letter); font-variant-numeric: tabular-nums; }
+.figures b.mark { color: var(--mark); }
+.figures span { font-size: 15px; line-height: 1.35; color: var(--ink-2); }
+@media (max-width: 760px) {
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .figures div:nth-child(3) { padding-left: 0; border-left: 0; }
+  .figures div:nth-child(n+3) { border-top: 1px solid var(--line); margin-top: var(--s-4); }
+}
+
+/* --- основная надпись, форма 1 --- */
+.tb {
+  justify-self: end; width: min(100%, 740px); border: 2px solid var(--ink); display: grid;
+  grid-template-columns: 74px 112px 68px minmax(0, 1fr) 64px 126px 82px;
+  font-size: 14px; line-height: 1.2;
+}
+.tb > div { border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 5px 7px; min-width: 0; }
+.tb .k { font: italic 400 13px/1.2 var(--f-letter); color: var(--ink-2); }
+.tb .v { font: italic 500 15px/1.2 var(--f-letter); }
+.tb .vm { font: 400 13px/1.25 var(--f-mono); }
+.tb .des { grid-column: 4 / 8; font: italic 600 26px/1 var(--f-letter); letter-spacing: .04em; display: flex; align-items: center; border-right: 0; }
+.tb .name { grid-column: 4; grid-row: 2 / 7; font: italic 500 19px/1.2 var(--f-letter); display: grid; align-content: center; gap: 6px; }
+.tb .name small { font: italic 400 15px/1.2 var(--f-letter); color: var(--ink-2); }
+.tb .r { border-right: 0; }
+.tb .org { grid-column: 5 / 8; grid-row: 5 / 7; border-right: 0; border-bottom: 0; display: grid; place-items: center; font: italic 600 24px/1 var(--f-letter); letter-spacing: .1em; }
+.tb .last { border-bottom: 0; }
+@media (max-width: 760px) {
+  .tb { grid-template-columns: 66px minmax(0, 1fr) 46px; font-size: 13px; }
+  .tb .des, .tb .name, .tb .org { grid-column: 1 / -1; grid-row: auto; border-right: 0; }
+  .tb .h3col, .tb .wide { display: none; }
+  .tb .r { border-right: 0; }
+}
+
+/* --- форма 2а: короткая надпись, следует за листом --- */
+.strip {
+  position: fixed; right: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  background: var(--sheet); border: 2px solid var(--ink); box-shadow: 0 6px 18px -10px rgba(0,0,0,.45);
+  width: min(420px, calc(100vw - 32px));
+}
+.strip button {
+  all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 62px; align-items: stretch;
+}
+.strip button > span { padding: 7px 8px; border-right: 1px solid var(--ink); display: grid; align-content: center; min-width: 0; }
+.strip button > span:last-child { border-right: 0; text-align: center; }
+.strip .s-des { font: italic 500 13px/1 var(--f-letter); letter-spacing: .04em; color: var(--ink-2); }
+.strip .s-name { font: italic 500 17px/1.1 var(--f-letter); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip .s-no { font: italic 600 17px/1 var(--f-letter); }
+.strip .s-no small { display: block; font: italic 400 11px/1 var(--f-letter); color: var(--ink-2); margin-bottom: 3px; letter-spacing: .06em; text-transform: uppercase; }
+.strip button:focus-visible { outline: 2px solid var(--mark); outline-offset: 3px; }
+.strip ol { list-style: none; margin: 0; padding: 4px 0; border-bottom: 1px solid var(--ink); counter-reset: s; }
+.strip li a {
+  display: grid; grid-template-columns: 40px 1fr; padding: 7px 10px; text-decoration: none;
+  font: italic 500 17px/1.1 var(--f-letter);
+}
+.strip li a::before { counter-increment: s; content: counter(s); color: var(--ink-2); }
+.strip li a:hover, .strip li a[aria-current="true"] { background: var(--grid); }
+@media (max-width: 600px) {
+  .strip { right: 8px; left: 8px; width: auto; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .strip button { grid-template-columns: minmax(0, 1fr) 58px; }
+  .strip .s-des-cell { display: none !important; }
+}
+
+/* --- лист 2: паспорт ВКР --- */
+.passport { display: grid; grid-template-columns: 200px minmax(0, 1fr); border-top: 2px solid var(--ink); }
+.passport > dt, .passport > dd { padding: var(--s-4) 0; border-bottom: 1px solid var(--line); margin: 0; }
+.passport > dt { font: italic 500 19px/1.3 var(--f-letter); padding-right: var(--s-4); }
+.passport > dd { min-width: 0; }
+.passport ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+.passport .topic { font: italic 500 24px/1.25 var(--f-letter); max-width: 44ch; margin: 0; }
+@media (max-width: 700px) {
+  .passport { grid-template-columns: minmax(0, 1fr); }
+  .passport > dt { border-bottom: 0; padding-bottom: 0; }
+}
+
+/* --- лист 3: лестница отсева --- */
+.ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.rung {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) minmax(170px, 230px); gap: var(--s-4) var(--s-5);
+  padding: var(--s-5) 0; border-top: 2px solid var(--ink); position: relative;
+}
+.rung:nth-child(2) { margin-left: 5%; } .rung:nth-child(3) { margin-left: 10%; } .rung:nth-child(4) { margin-left: 15%; }
+.rung.plan { border-top: 2px dashed var(--line); }
+.rung .n { font: italic 600 54px/0.9 var(--f-letter); color: var(--ink); }
+.rung.plan .n { color: var(--ink-2); }
+.rung .body { display: grid; gap: var(--s-3); min-width: 0; }
+.rung .meta { display: grid; gap: var(--s-2); align-content: start; justify-items: start; }
+.rung .count { font: italic 600 clamp(26px, 3vw, 36px)/1.1 var(--f-letter); font-variant-numeric: tabular-nums; display: grid; gap: 2px; }
+.rung .count .to { color: var(--line); font-style: normal; font-weight: 400; margin-right: 6px; font-size: .8em; }
+.rung .code { font: 400 14px/1.2 var(--f-mono); color: var(--ink-2); }
+.rung .count .mark { color: var(--mark); }
+@media (max-width: 760px) {
+  .rung { grid-template-columns: 44px minmax(0, 1fr); }
+  .rung .meta { grid-column: 2; }
+  .rung:nth-child(n) { margin-left: 0; }
+  .rung .n { font-size: 40px; }
+}
+details.rules { border: 1px solid var(--line); }
+details.rules summary {
+  cursor: pointer; padding: 8px 12px; font: italic 500 17px/1.2 var(--f-letter); list-style: none;
+  display: flex; justify-content: space-between; gap: var(--s-3);
+}
+details.rules summary::-webkit-details-marker { display: none; }
+details.rules summary::after { content: "+"; font-style: normal; color: var(--mark); }
+details.rules[open] summary::after { content: "−"; }
+details.rules ol { margin: 0; padding: var(--s-2) var(--s-4) var(--s-4) 2.2em; display: grid; gap: var(--s-3); border-top: 1px solid var(--line); }
+details.rules li { max-width: 70ch; }
+details.rules code { font: 400 13px/1.4 var(--f-mono); color: var(--ink-2); display: block; margin-top: 2px; overflow-wrap: anywhere; }
+.principle { border: 2px solid var(--mark); padding: var(--s-5); display: grid; gap: var(--s-3); }
+.principle h3 { color: var(--mark); }
+.legend-sym { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--s-3); font-size: 15px; color: var(--ink-2); margin: 0; }
+.legend-sym dt { font: 400 15px/1.4 var(--f-mono); color: var(--ink); }
+.legend-sym dd { margin: 0; }
+
+/* --- лист 4: схема структурная --- */
+.scheme-wrap { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--s-6); align-items: start; }
+@media (max-width: 900px) { .scheme-wrap { grid-template-columns: minmax(0, 1fr); } }
+.scheme { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px 18px; padding: 4px 0; }
+.scheme svg.links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.scheme svg.links path { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+.scheme svg.links path.plan { stroke: var(--line); stroke-dasharray: 7 5; }
+.scheme svg.links .ah { fill: var(--ink); } .scheme svg.links .ah.plan { fill: var(--line); }
+.scheme svg.links path.ah { stroke: none; }
+.blk {
+  all: unset; box-sizing: border-box; cursor: pointer; position: relative; z-index: 1;
+  background: var(--sheet); border: 2px solid var(--ink); padding: 8px 10px; min-height: 58px;
+  display: grid; align-content: center; gap: 2px; text-align: center;
+}
+.blk small { font: 400 11px/1 var(--f-mono); color: var(--ink-2); letter-spacing: .02em; }
+.blk span { font: italic 600 19px/1.05 var(--f-letter); overflow-wrap: anywhere; }
+.blk.plan { border-style: dashed; border-color: var(--line); border-width: 2px; }
+.blk.plan span { color: var(--ink-2); }
+.blk[aria-pressed="true"] { outline: 2px solid var(--mark); outline-offset: 3px; }
+.blk:focus-visible { outline: 2px solid var(--mark); outline-offset: 3px; }
+.callout { border-left: 2px solid var(--mark); padding: var(--s-2) var(--s-4); min-height: 76px; display: grid; gap: 4px; align-content: start; }
+.callout b { font: italic 600 20px/1.1 var(--f-letter); }
+.tt { margin: 0; padding-left: 1.4em; display: grid; gap: var(--s-2); }
+.tt li { max-width: 62ch; }
+.tt li::marker { font-family: var(--f-letter); font-style: italic; font-weight: 600; }
+.leg { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); font-size: 15px; color: var(--ink-2); align-items: center; }
+.leg i { display: inline-block; width: 34px; height: 0; border-top: 2px solid var(--ink); vertical-align: middle; margin-right: 8px; }
+.leg i.d { border-top: 2px dashed var(--line); }
+
+/* --- таблицы: протокол и спецификация --- */
+.tbl-wrap { overflow-x: auto; max-width: 100%; }
+table.gost { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 16px; }
+table.gost th, table.gost td { border: 1px solid var(--ink); padding: 7px 10px; text-align: left; vertical-align: top; }
+table.gost thead th { font: italic 500 15px/1.2 var(--f-letter); letter-spacing: .03em; border-bottom: 2px solid var(--ink); }
+table.gost { border: 2px solid var(--ink); }
+table.gost td.num, table.gost th.num { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.gost td.c { text-align: center; font-family: var(--f-mono); }
+table.gost td.des { font-family: var(--f-mono); font-size: 14px; white-space: nowrap; }
+table.gost tr.work td { color: var(--mark); }
+table.gost .res { font-family: var(--f-mono); font-size: 15px; }
+.caption-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-2) var(--s-4); align-items: baseline; }
+
+/* роли и цикл */
+.roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid var(--ink); }
+.roles div { padding: var(--s-4) var(--s-4) var(--s-4) 0; display: grid; gap: 6px; align-content: start; }
+.roles div + div { padding-left: var(--s-4); border-left: 1px solid var(--line); }
+.roles b { font: italic 600 24px/1.1 var(--f-letter); }
+@media (max-width: 760px) {
+  .roles { grid-template-columns: minmax(0, 1fr); }
+  .roles div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+}
+.cycle { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; margin: 0; padding: 0; list-style: none; }
+.cycle li { border: 1px solid var(--ink); padding: 6px 12px; font: italic 500 17px/1.2 var(--f-letter); }
+.cycle li.arrow { border: 0; padding: 0 2px; color: var(--line); font-style: normal; }
+.cycle li.ok { border-color: var(--mark); color: var(--mark); }
+
+/* --- лист 7: маршрутная карта --- */
+.route { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
+.route li { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; gap: var(--s-2) var(--s-4); padding: var(--s-4) 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.route .op { font: 400 18px/1 var(--f-mono); color: var(--ink-2); }
+.route b { font: italic 600 21px/1.2 var(--f-letter); }
+.route p { margin-top: 4px; color: var(--ink-2); font-size: 16px; }
+@media (max-width: 640px) { .route li { grid-template-columns: 54px minmax(0, 1fr); } .route .chip { grid-column: 2; justify-self: start; } }
+
+.foot { font-size: 14px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); }
+
+@media (max-width: 600px) {
+  .plug figure { overflow-x: auto; }
+  .plug svg { min-width: 620px; }
+  .blk { padding: 6px 4px; min-height: 52px; }
+  .blk span { font-size: 15px; overflow-wrap: normal; }
+  .scheme { gap: 26px 10px; }
+  :root { --bind: 16px; --edge: 6px; }
+  body { font-size: 16px; padding-inline: 10px; }
+  .frame-in { padding: var(--s-5) var(--s-4) var(--s-4); gap: var(--s-5); }
+  .g26, .binding { display: none; }
+  .sheet-head { padding-top: 0; }
+  .lead { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .pen { animation: none !important; stroke-dashoffset: 0 !important; } }
+@keyframes plot { to { stroke-dashoffset: 0; } }
+.tb-m { display: none; border: 2px solid var(--ink); }
+.tb-m div { display: flex; justify-content: space-between; gap: var(--s-3); padding: 6px 10px; border-bottom: 1px solid var(--ink); font: italic 500 16px/1.2 var(--f-letter); }
+.tb-m div:last-child { border-bottom: 0; }
+.tb-m .k { color: var(--ink-2); font-weight: 400; }
+.tb-m .des { font-size: 22px; font-weight: 600; letter-spacing: .04em; }
+@media (max-width: 760px) { .tb { display: none; } .tb-m { display: block; } }
+</style>
+
+<main class="set">
+
+<!-- ЛИСТ 1 -->
+<section class="sheet" id="list-1" data-name="Общий вид" aria-labelledby="h-1">
+  <div class="frame">
+    <div class="g26" aria-hidden="true"><span>MOSST.ВИМ.012</span></div>
+    <div class="frame-in">
+      <div class="sheet-head"><span class="sheet-no">Лист 1</span><span class="label">Общий вид</span></div>
+      <div class="hero">
+        <h1 id="h-1">MOSST</h1>
+        <p class="sub">Вычислительная инженерная модель малой двигательной установки с аэроспайком</p>
+        <p class="lead">Модель принимает решения сама: выбирает пару топлив, материал, схему подачи и вариант плуга, потом считает размеры и строит деталь для печати. При заданном полном импульсе она ищет наименьшую стартовую массу. Габарит, ресурс, тепло в борт и пиковая мощность для неё — жёсткие ограничения.</p>
+        <ol class="path" aria-label="Путь модели; будущие шаги подчёркнуты штриховой линией">
+          <li>требование</li>
+          <li>выбор схемы</li>
+          <li class="todo"><span>связанный сайзинг</span></li>
+          <li class="todo"><span>печатаемая геометрия</span></li>
+        </ol>
+      </div>
+
+      <div class="plug">
+        <figure>
+          <svg class="dwg" id="dwg" viewBox="0 0 1000 560" role="img" aria-labelledby="dwg-t dwg-d">
+            <title id="dwg-t">Контур центрального тела аэроспайка</title>
+            <desc id="dwg-d">Сверху половина разреза: центральное тело и обечайка заштрихованы, от кромки обечайки к контуру идут прямые характеристики веера разрежения. Снизу половина вида. Размеры: радиус кромки и длина плуга.</desc>
+            <defs>
+              <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line class="hl" x1="0" y1="0" x2="0" y2="9"/>
+              </pattern>
+              <marker id="ar" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="11" markerHeight="11" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                <path class="arr" d="M0,2 L10,5 L0,8 z"/>
+              </marker>
+            </defs>
+            <g id="dwg-layer"></g>
+          </svg>
+          <figcaption>Половина разреза сверху, половина вида снизу. Контур — приближённый метод Анджелино: каждая точка контура соединена с кромкой прямой характеристикой; красная — последняя, M<sub>e</sub>.</figcaption>
+        </figure>
+        <div class="ctl">
+          <div class="label">Расчёт контура</div>
+          <label for="eps"><span class="row"><span>Степень расширения ε</span><output id="eps-o" for="eps">25,0</output></span>
+            <input type="range" id="eps" min="0" max="1000" step="1" value="506"></label>
+          <label for="gam"><span class="row"><span>Показатель адиабаты γ</span><output id="gam-o" for="gam">1,20</output></span>
+            <input type="range" id="gam" min="1.12" max="1.40" step="0.01" value="1.20"></label>
+          <div class="seg" role="radiogroup" aria-label="Длина плуга">
+            <input type="radio" name="len" id="len-full" value="full" checked><label for="len-full">полный</label>
+            <input type="radio" name="len" id="len-cut" value="cut"><label for="len-cut">укороченный, 20 %</label>
+          </div>
+          <dl class="readout">
+            <dt>Число Маха на срезе M<sub>e</sub></dt><dd id="o-me">—</dd>
+            <dt>Поворот потока ν<sub>e</sub></dt><dd id="o-nu">—</dd>
+            <dt>Длина плуга L / R<sub>e</sub></dt><dd id="o-l">—</dd>
+            <dt>Ширина горла h / R<sub>e</sub></dt><dd id="o-h">—</dd>
+            <dt>C<sub>F</sub> в вакууме</dt><dd id="o-cf">—</dd>
+          </dl>
+          <p class="note" id="o-print">—</p>
+          <p class="note">Формулы те же, что в <span class="mono">Cem.Physics</span>: C<sub>F</sub> идеального сопла и длина плуга L = R<sub>e</sub>·√(M<sub>e</sub>² − 1).</p>
+        </div>
+      </div>
+
+      <div class="figures">
+        <div><b class="mark">1412</b><span>тестов в семи тестовых проектах</span></div>
+        <div><b>927&nbsp;255</b><span>сравнений границы с NASA CEA — нарушений ноль</span></div>
+        <div><b>55</b><span>источников данных: у каждого числа документ, место и ссылка</span></div>
+        <div><b>11</b><span>инкрементов принято, двенадцатый в работе</span></div>
+      </div>
+
+      <div class="tb" role="group" aria-label="Основная надпись">
+        <div class="k">Изм.</div><div class="k">№ докум.</div><div class="k">Дата</div>
+        <div class="des">MOSST.ВИМ.012</div>
+        <div class="name">ВИМ малой ДУ с аэроспайком<small>Комплект листов · Общий вид</small></div>
+        <div class="org">MOSST</div>
+        <div class="k">Разраб.</div><div class="v">Hoi</div><div class="vm">06.10.26</div>
+        <div class="k">Лит.</div><div class="k">Масса</div><div class="k r">Масштаб</div>
+        <div class="k">Пров.</div><div class="v">Claude</div><div class="vm"></div>
+        <div class="v">У</div><div class="vm" title="Нижняя граница стартовой массы для примера: кислород и керосин, 500 Н, 10⁵ Н·с, конверт ⌀400 × 500 мм, вытеснительная подача (часть 2d)">m₀ ≥ 30,81 кг</div><div class="v r">—</div>
+        <div class="k">Т. контр.</div><div class="v">1412 тестов</div><div class="vm"></div>
+        <div class="v">Лист 1</div><div class="v r" style="grid-column: span 2">Листов 7</div>
+        <div class="k">Н. контр.</div><div class="v">инварианты</div><div class="vm"></div>
+        <div class="k last">Утв.</div><div class="v last"></div><div class="vm last"></div>
+      </div>
+      <div class="tb-m" role="group" aria-label="Основная надпись">
+        <div><span class="des">MOSST.ВИМ.012</span><span>Лит. У</span></div>
+        <div><span class="k">Масса</span><span class="mono">m₀ ≥ 30,81 кг</span></div>
+        <div><span class="k">Разраб. · Пров.</span><span>Hoi · Claude</span></div>
+        <div><span class="k">Т. контр.</span><span>1412 тестов</span></div>
+        <div><span class="k">Утв.</span><span></span></div>
+      </div>
+      <p class="note">Масса в основной надписи — нижняя граница стартовой массы для примера: кислород и керосин, тяга 500 Н, импульс 10⁵ Н·с, установка в конверте ⌀400 × 500 мм, вытеснительная подача. Графа «Утв.» оставлена для руководителя.</p>
+    </div>
+  </div>
+  <div class="binding" aria-hidden="true"><div><span>Инв. № подл.</span></div><div><span>Подп. и дата</span></div><div><span>Взам. инв. №</span></div></div>
+</section>
+
+
+<!-- ЛИСТ 2 -->
+<section class="sheet" id="list-2" data-name="Паспорт ВКР" aria-labelledby="h-2">
+  <div class="frame">
+    <div class="g26" aria-hidden="true"><span>MOSST.ВИМ.012</span></div>
+    <div class="frame-in">
+      <div class="sheet-head"><span class="sheet-no">Лист 2</span><span class="label">Паспорт ВКР</span></div>
+      <h2 id="h-2">Паспорт выпускной работы</h2>
+      <p class="muted">Рабочая редакция: тема и формулировки утверждаются с руководителем.</p>
+      <dl class="passport">
+        <dt>Тема</dt>
+        <dd><p class="topic">Вычислительная инженерная модель малой двигательной установки с аэроспайком: отсев проектных решений с доказанной нижней границей массы</p></dd>
+        <dt>Цель</dt>
+        <dd>Сократить пространство схем малой двигательной установки до немногих финалистов, не потеряв ни одной годной конструкции, и проследить каждое число модели до его источника.</dd>
+        <dt>Задачи</dt>
+        <dd><ol>
+          <li>Формализовать пространство схем: девять осей выбора и правила их совместимости.</li>
+          <li>Вывести нижние границы стартовой массы для аналитического отсева: топливо, объём в габарите, баки, насос, баллон наддува.</li>
+          <li>Собрать справочник материалов, процесса L-PBF и термохимии с полосами неопределённости и источниками.</li>
+          <li>Проверить границы против NASA CEA, против эталонного прототипа и на семействах конструкций.</li>
+          <li>Спроектировать связанный сайзинг и построение печатаемой геометрии для финалистов.</li>
+        </ol></dd>
+        <dt>Объект</dt>
+        <dd>Малые двигательные установки космических аппаратов с аэроспайком — соплом с центральным телом.</dd>
+        <dt>Предмет</dt>
+        <dd>Методы раннего выбора и отсева проектных решений, при которых годные варианты не отбрасываются.</dd>
+        <dt>Методы</dt>
+        <dd>Системная инженерия и иерархия уровней отсева; распространение ограничений с дуговой согласованностью; метод ветвей и границ; интервальная арифметика; теорема о вириале для оболочек под давлением; термохимия NASA CEA; тестирование свойств и сквозные проверки.</dd>
+        <dt>Новизна</dt>
+        <dd>Второй уровень отсева построен как доказанная граница, а не как оценка: вариант уходит, только если даже его оптимистичная масса недопустима или хуже уже найденной конструкции. Границы массы баков и баллона наддува выведены из теоремы о вириале и не зависят от формы оболочки.</dd>
+        <dt>Значимость</dt>
+        <dd>Инструмент ранних стадий проектирования малых двигательных установок: отсекает недостижимые схемы до дорогого расчёта и показывает, на каких данных держится каждое решение. Одно требование всегда даёт побайтово тот же результат, поэтому расчёт воспроизводим.</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="binding" aria-hidden="true"><div><span>Инв. № подл.</span></div><div><span>Подп. и дата</span></div><div><span>Взам. инв. №</span></div></div>
+</section>
+
+<!-- ЛИСТ 3 -->
+<section class="sheet" id="list-3" data-name="Схема отсева" aria-labelledby="h-3">
+  <div class="frame">
+    <div class="g26" aria-hidden="true"><span>MOSST.ВИМ.012</span></div>
+    <div class="frame-in">
+      <div class="sheet-head"><span class="sheet-no">Лист 3</span><span class="label">Схема отсева</span></div>
+      <h2 id="h-3">Лестница отсева</h2>
+      <p class="lead">Перебрать все конструкции нельзя: дискретных сочетаний 373&nbsp;248, и у каждого есть непрерывные размеры. Поэтому модель отсеивает лестницей. Каждая следующая ступень дороже и точнее и видит только тех, кого пропустила предыдущая.</p>
+      <ol class="ladder">
+        <li class="rung">
+          <div class="n" aria-hidden="true">1</div>
+          <div class="body">
+            <h3>Распространение ограничений</h3>
+            <p>Девять осей выбора: пара топлив, материал, охлаждение, подача, вариант плуга, смесительная головка, зажигание, разбиение на детали и ориентация печати. Правила этой ступени говорят только «такого не бывает» и не сравнивают чисел.</p>
+            <p>Пример. Выберем АТ+ММГ, охлаждение излучением и кластер модулей — из 373&nbsp;248 сочетаний останется 2&nbsp;592. Правила сужают до 216: зажигание у этой пары только гиперголическое, излучающая стенка — только из жаропрочного сплава, кластер модулей не бывает одной деталью.</p>
+            <details class="rules">
+              <summary>Пять правил совместимости</summary>
+              <ol>
+                <li>Самовоспламеняющаяся пара и гиперголическое зажигание связаны в обе стороны: АТ+ММГ воспламенителя не несёт, а при другой паре гиперголическому зажиганию нечего делать.<code>ignition.hypergolic-binds-the-hypergolic-pair</code></li>
+                <li>Каталитическое зажигание требует компонента, который разлагается на катализаторе: однокомпонентные пары и высокопробный пероксид.<code>ignition.catalytic-needs-a-decomposable-component</code></li>
+                <li>Соосной смесительной головки у однокомпонентной пары нет: второго потока не существует.<code>injector.mono-has-no-coaxial</code></li>
+                <li>Радиационная стенка по назначению работает горячей. Медь и титан выбирают за другое: медь — за теплопроводность тракта, титан — за прочность холодной конструкции.<code>cooling.radiative-needs-a-high-temperature-alloy</code></li>
+                <li>Кластер из отдельных модулей не может быть одной монолитной деталью.<code>partition.clustered-is-not-monolithic</code></li>
+              </ol>
+            </details>
+          </div>
+          <div class="meta">
+            <div class="count"><span>373&nbsp;248</span><span><span class="to">→</span>2&nbsp;592</span><span><span class="to">→</span><span class="mark">216</span></span></div>
+            <span class="chip">построено</span><span class="code">Cem.Discrete</span>
+          </div>
+        </li>
+        <li class="rung">
+          <div class="n" aria-hidden="true">2</div>
+          <div class="body">
+            <h3>Аналитический отсев</h3>
+            <p>Для каждого сочетания — нижняя граница стартовой массы: топливо через наибольшую скорость истечения, объём в габарите, баки и баллон наддува по теореме о вириале, электронасос по удельной мощности батареи и привода. Давление в камере — переменная, и граница берёт минимум по нему.</p>
+            <div class="formula">m₀ ≥ max( min<sub>P</sub> { I<sub>Σ</sub> / c<sub>max</sub>(P) + <b>(a<sub>б</sub> + a<sub>г</sub>)·P</b> } ;  I<sub>Σ</sub> / c<sub>max</sub> )</div>
+            <dl class="legend-sym">
+              <dt>I<sub>Σ</sub></dt><dd>полный импульс из требования</dd>
+              <dt>c<sub>max</sub>(P)</dt><dd>наибольшая скорость истечения при давлении в камере не выше P</dd>
+              <dt>a<sub>б</sub>, a<sub>г</sub></dt><dd>цена давления баков и баллона: (3/2)·V<sub>min</sub>/s, где s — удельная прочность лучшего материала каталога</dd>
+            </dl>
+          </div>
+          <div class="meta">
+            <div class="count"><span>5&nbsp;частей</span></div>
+            <span class="chip">построено</span><span class="code">Cem.Screening</span>
+            <span class="chip work">часть 2e в работе</span>
+          </div>
+        </li>
+        <li class="rung plan">
+          <div class="n" aria-hidden="true">3</div>
+          <div class="body">
+            <h3>Связанный сайзинг</h3>
+            <p>Тепло, прочность и гидравлика по станциям выработки. Состояние модели — история от начала до конца работы двигателя, а не одно число, и каждое ограничение помнит станцию, на которой оно связало.</p>
+          </div>
+          <div class="meta"><span class="chip plan">запланировано</span><span class="code">Cem.Solver</span></div>
+        </li>
+        <li class="rung plan">
+          <div class="n" aria-hidden="true">4</div>
+          <div class="body">
+            <h3>Геометрия</h3>
+            <p>Только для финалистов. Тело строится на воксельном ядре PicoGK; минимальная стенка обеспечивается самим построением, а не проверкой после него.</p>
+          </div>
+          <div class="meta"><span class="chip plan">запланировано</span><span class="code">Cem.Geometry</span></div>
+        </li>
+      </ol>
+      <div class="principle">
+        <h3>Граница, а не оценка</h3>
+        <p>Дешёвая ступень обязана давать оптимистичную границу: настоящая конструкция не может оказаться легче её. Тогда отсев не теряет годных вариантов — вариант уходит, только если даже его граница уже недопустима или хуже найденной конструкции. Взять вместо границы оценку значит рисковать выбросить лучший вариант.</p>
+      </div>
+    </div>
+  </div>
+  <div class="binding" aria-hidden="true"><div><span>Инв. № подл.</span></div><div><span>Подп. и дата</span></div><div><span>Взам. инв. №</span></div></div>
+</section>
+
+<!-- ЛИСТ 4 -->
+<section class="sheet" id="list-4" data-name="Схема структурная" aria-labelledby="h-4">
+  <div class="frame">
+    <div class="g26" aria-hidden="true"><span>MOSST.ВИМ.012</span></div>
+    <div class="frame-in">
+      <div class="sheet-head"><span class="sheet-no">Лист 4</span><span class="label">Схема структурная</span></div>
+      <h2 id="h-4">Слои кода</h2>
+      <p class="lead">Двенадцать проектов, зависимости только вниз. Построено шесть — от типов величин до второй ступени отсева. Остальные появятся, когда до них дойдёт очередь: пустые заготовки создают только видимость структуры.</p>
+      <div class="scheme-wrap">
+        <div style="display:grid; gap: var(--s-4); min-width:0">
+          <div class="scheme" id="scheme">
+            <svg class="links" aria-hidden="true"></svg>
+            <button class="blk plan" id="b-a" data-k="a" style="grid-row:1; grid-column:1" aria-pressed="false"><small>Cem.</small><span>App</span></button>
+            <button class="blk plan" id="b-r" data-k="r" style="grid-row:1; grid-column:3" aria-pressed="false"><small>Cem.</small><span>Report</span></button>
+            <button class="blk plan" id="b-h" data-k="h" style="grid-row:2; grid-column:2" aria-pressed="false"><small>Cem.</small><span>Search</span></button>
+            <button class="blk plan" id="b-g" data-k="g" style="grid-row:2; grid-column:3" aria-pressed="false"><small>Cem.</small><span>Geometry</span></button>
+            <button class="blk plan" id="b-v" data-k="v" style="grid-row:3; grid-column:1" aria-pressed="false"><small>Cem.</small><span>Solver</span></button>
+            <button class="blk plan" id="b-m" data-k="m" style="grid-row:4; grid-column:1" aria-pressed="false"><small>Cem.</small><span>Components</span></button>
+            <button class="blk" id="b-s" data-k="s" style="grid-row:4; grid-column:3" aria-pressed="true"><small>Cem.</small><span>Screening</span></button>
+            <button class="blk" id="b-p" data-k="p" style="grid-row:5; grid-column:1" aria-pressed="false"><small>Cem.</small><span>Physics</span></button>
+            <button class="blk" id="b-d" data-k="d" style="grid-row:5; grid-column:2" aria-pressed="false"><small>Cem.</small><span>Data</span></button>
+            <button class="blk" id="b-x" data-k="x" style="grid-row:5; grid-column:3" aria-pressed="false"><small>Cem.</small><span>Discrete</span></button>
+            <button class="blk" id="b-c" data-k="c" style="grid-row:6; grid-column:2" aria-pressed="false"><small>Cem.</small><span>Contracts</span></button>
+            <button class="blk" id="b-q" data-k="q" style="grid-row:7; grid-column:2" aria-pressed="false"><small>Cem.</small><span>Quantities</span></button>
+          </div>
+          <div class="leg"><span><i></i>построено</span><span><i class="d"></i>запланировано</span><span>стрелка — «опирается на»</span></div>
+        </div>
+        <div style="display:grid; gap: var(--s-5); min-width:0">
+          <div class="callout" id="callout" aria-live="polite">
+            <b id="co-name">Cem.Screening</b>
+            <span id="co-role">Вторая ступень лестницы: нижние границы стартовой массы и поиск по давлению в камере. Она не знает о третьей ступени, иначе её граница зависела бы от того, что она ограничивает.</span>
+          </div>
+          <div style="display:grid; gap: var(--s-3)">
+            <h3>Технические требования</h3>
+            <ol class="tt">
+              <li>Каждая физическая величина — собственный тип в СИ. Неявного приведения к числу нет, оператор определён, только если он осмыслен.</li>
+              <li>Зависимости между слоями только вниз. Ядро геометрии видит один проект — <span class="mono">Cem.Geometry</span>.</li>
+              <li>Одно требование даёт побайтово тот же результат и тот же <span class="mono">ContentHash</span>: ни времени, ни незасеянных случайных чисел в расчёте.</li>
+              <li>Полосы неопределённости интервальные. Справочник не экстраполирует: вне области данных — сигнал, а не число.</li>
+              <li>Штатный отказ — нет каталожного элемента, решатель не сошёлся — возвращается поиску результатом, а не исключением.</li>
+              <li>Дешёвая ступень лестницы даёт границу, а не приближение.</li>
+              <li>Состояние — история по станциям выработки; каждое ограничение хранит запас и связывающую станцию.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="binding" aria-hidden="true"><div><span>Инв. № подл.</span></div><div><span>Подп. и дата</span></div><div><span>Взам. инв. №</span></div></div>
+</section>
+
+<!-- ЛИСТ 5 -->
+<section class="sheet" id="list-5" data-name="Протокол испытаний" aria-labelledby="h-5">
+  <div class="frame">
+    <div class="g26" aria-hidden="true"><span>MOSST.ВИМ.012</span></div>
+    <div class="frame-in">
+      <div class="sheet-head"><span class="sheet-no">Лист 5</span><span class="label">Протокол испытаний</span></div>
+      <h2 id="h-5">Чем доказано</h2>
+      <p class="lead">Утверждение модели принимается, когда оно проверено снаружи: эталоном, независимым расчётом или сравнением с прототипом. Граница, которая хоть раз оказалась выше достижимой массы, — не граница.</p>
+      <div class="tbl-wrap">
+        <table class="gost">
+          <thead><tr><th class="num">№</th><th>Что проверено</th><th>Как</th><th>Результат</th></tr></thead>
+          <tbody>
+            <tr><td class="c">1</td><td>Граница топлива m₀ ≥ I<sub>Σ</sub>/c<sub>max</sub></td><td>Против замороженного Ivac NASA CEA на семействах требований, обвязка на C#</td><td class="res">927&nbsp;255 сравнений, нарушений 0</td></tr>
+            <tr><td class="c">2</td><td>Граница с баками и баллоном наддува</td><td>Ослабленные конструкции по CEA, семейство E12 из 864 выборов</td><td class="res">154&nbsp;035 сравнений, нарушений 0; ближе всего 0,981</td></tr>
+            <tr><td class="c">3</td><td>Граница электронасоса</td><td>То же семейство, E11</td><td class="res">154&nbsp;035 сравнений, нарушений 0; ближе всего 0,976</td></tr>
+            <tr><td class="c">4</td><td>Код против прототипа</td><td>Эталонный прототип на Python считает те же семейства</td><td class="res">m₀ совпадает до 4·10⁻⁷, число шагов поиска — то же</td></tr>
+            <tr><td class="c">5</td><td>Справочник</td><td>У каждого числа документ, место и ссылка; дыра остаётся дырой</td><td class="res">55 источников</td></tr>
+            <tr><td class="c">6</td><td>Детерминизм</td><td>Одно требование дважды и в обратном порядке вызовов</td><td class="res">побайтово тот же ContentHash</td></tr>
+            <tr><td class="c">7</td><td>Набор тестов</td><td>Архитектурные, модульные, свойств и сквозные — в семи тестовых проектах</td><td class="res">1412 тестов, все зелёные</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">«Ближе всего» — наибольшее отношение границы к массе достижимой конструкции. Меньше единицы — граница верна; чем ближе к единице, тем она теснее.</p>
+
+      <div style="display:grid; gap: var(--s-4)">
+        <h3>Кто что делает</h3>
+        <div class="roles">
+          <div><b>Hoi</b><span class="label">инженер и автор</span><p>Ставит задачи, принимает решения по модели, принимает каждый инкремент.</p></div>
+          <div><b>Claude</b><span class="label">claude.ai</span><p>Пишет брифы инкрементов, собирает данные с источниками, делает ревью кода и чисел.</p></div>
+          <div><b>Claude Code</b><span class="label">агент в VS Code</span><p>Пишет код по брифу и прогоняет тесты.</p></div>
+        </div>
+        <ol class="cycle" aria-label="Цикл инкремента">
+          <li>бриф</li><li class="arrow" aria-hidden="true">→</li>
+          <li>реализация</li><li class="arrow" aria-hidden="true">→</li>
+          <li>ревью</li><li class="arrow" aria-hidden="true">→</li>
+          <li>правки</li><li class="arrow" aria-hidden="true">→</li>
+          <li class="ok">приёмка</li>
+        </ol>
+        <p>Инкремент принят, когда сборка проходит без предупреждений, все тесты зелёные, числа совпали с прототипом и независимое ревью не нашло блокеров. Перед выдачей бриф читает ещё и отдельный агент-рецензент: в брифе 8 он нашёл две ошибки в доказательстве, в брифе 12 — общую деталь бака и баллона, из-за которой граница могла оказаться выше настоящей массы.</p>
+      </div>
+    </div>
+  </div>
+  <div class="binding" aria-hidden="true"><div><span>Инв. № подл.</span></div><div><span>Подп. и дата</span></div><div><span>Взам. инв. №</span></div></div>
+</section>
+
+<!-- ЛИСТ 6 -->
+<section class="sheet" id="list-6" data-name="Спецификация" aria-labelledby="h-6">
+  <div class="frame">
+    <div class="g26" aria-hidden="true"><span>MOSST.ВИМ.012</span></div>
+    <div class="frame-in">
+      <div class="sheet-head"><span class="sheet-no">Лист 6</span><span class="label">Спецификация</span></div>
+      <div class="caption-row"><h2 id="h-6">Спецификация</h2><span class="muted">Кол. — тестов в решении после приёмки</span></div>
+      <div class="tbl-wrap">
+        <table class="gost">
+          <thead><tr><th class="num">Поз.</th><th>Обозначение</th><th>Наименование</th><th class="num">Кол.</th><th>Примечание</th></tr></thead>
+          <tbody>
+            <tr><td class="c">1</td><td class="des">Cem.Quantities</td><td>Типы физических величин</td><td class="num">—</td><td>принят</td></tr>
+            <tr><td class="c">2</td><td class="des">Cem.Contracts</td><td>Требование, сигналы, Outcome, домены осей</td><td class="num">—</td><td>принят</td></tr>
+            <tr><td class="c">3</td><td class="des">Cem.Physics</td><td>Изэнтропа, сопло, Прандтль—Майер, кольцевое горло</td><td class="num">—</td><td>принят</td></tr>
+            <tr><td class="c">4</td><td class="des">Cem.Discrete</td><td>Девять осей, правила совместимости, топология</td><td class="num">771</td><td>принят после правок</td></tr>
+            <tr><td class="c">5</td><td class="des">Cem.Data</td><td>Датумы с цитатами, материалы, процесс L-PBF</td><td class="num">943</td><td>принят</td></tr>
+            <tr><td class="c">6</td><td class="des">Cem.Data</td><td>Термохимия четырёх пар, NASA CEA</td><td class="num">1024</td><td>принят 27.09</td></tr>
+            <tr><td class="c">7</td><td class="des">Cem.Screening</td><td>Отсев, часть 1: граница топлива</td><td class="num">1114</td><td>принят 29.09</td></tr>
+            <tr><td class="c">8</td><td class="des">Cem.Screening</td><td>Часть 2a: плотности компонентов и объём в габарите</td><td class="num">1196</td><td>принят 29.09</td></tr>
+            <tr><td class="c">9</td><td class="des">Cem.Screening</td><td>Часть 2b: давление в камере, баки</td><td class="num">1312</td><td>принят 29.09</td></tr>
+            <tr><td class="c">10</td><td class="des">Cem.Screening</td><td>Часть 2c: электронасосная подача</td><td class="num">1402</td><td>принят 01.10</td></tr>
+            <tr><td class="c">11</td><td class="des">Cem.Screening</td><td>Часть 2d: баллон наддува</td><td class="num">1412</td><td>принят 04.10</td></tr>
+            <tr class="work"><td class="c">12</td><td class="des">Cem.Screening</td><td>Часть 2e: каталог сосудов, композитный баллон</td><td class="num">—</td><td>бриф 06.10, в работе</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="binding" aria-hidden="true"><div><span>Инв. № подл.</span></div><div><span>Подп. и дата</span></div><div><span>Взам. инв. №</span></div></div>
+</section>
+
+<!-- ЛИСТ 7 -->
+<section class="sheet" id="list-7" data-name="Маршрутная карта" aria-labelledby="h-7">
+  <div class="frame">
+    <div class="g26" aria-hidden="true"><span>MOSST.ВИМ.012</span></div>
+    <div class="frame-in">
+      <div class="sheet-head"><span class="sheet-no">Лист 7</span><span class="label">Маршрутная карта</span></div>
+      <h2 id="h-7">Что дальше</h2>
+      <p class="lead">Операции по порядку. Дат нет: следующая начинается, когда принята предыдущая.</p>
+      <ol class="route">
+        <li><span class="op">005</span><div><b>Часть 2e — каталог сосудов</b><p>Композитный баллон наддува из ламината IM7/8552 по данным квалификации NCAMP.</p></div><span class="chip work">бриф выдан</span></li>
+        <li><span class="op">010</span><div><b>Часть 2f — потолок мощности электронасоса</b><p>Цена давления растёт с давлением, когда насосу не хватает мощности бортовой сети.</p></div><span class="chip plan">далее</span></li>
+        <li><span class="op">015</span><div><b>Газогенераторный насос</b><p>Нужна термохимия газогенератора при ограниченной температуре турбины.</p></div><span class="chip plan">нужны данные</span></li>
+        <li><span class="op">020</span><div><b>Третья ступень — связанный сайзинг</b><p>Тепло, прочность и гидравлика по станциям выработки.</p></div><span class="chip plan">запланировано</span></li>
+        <li><span class="op">025</span><div><b>Четвёртая ступень — геометрия</b><p>Печатаемое тело финалистов на PicoGK и проверка печати L-PBF.</p></div><span class="chip plan">запланировано</span></li>
+        <li><span class="op">030</span><div><b>ВКР</b><p>Утверждение темы, текст работы, защита.</p></div><span class="chip plan">запланировано</span></li>
+      </ol>
+      <div class="foot"><span>MOSST · C# / .NET</span><span>Брифы, ревью и справочные данные лежат в репозитории проекта</span><span>Состояние на 6 октября 2026</span></div>
+    </div>
+  </div>
+  <div class="binding" aria-hidden="true"><div><span>Инв. № подл.</span></div><div><span>Подп. и дата</span></div><div><span>Взам. инв. №</span></div></div>
+</section>
+
+</main>
+
+<nav class="strip" aria-label="Листы комплекта">
+  <ol id="sheet-list" hidden>
+    <li><a href="#list-1">Общий вид</a></li>
+    <li><a href="#list-2">Паспорт ВКР</a></li>
+    <li><a href="#list-3">Схема отсева</a></li>
+    <li><a href="#list-4">Схема структурная</a></li>
+    <li><a href="#list-5">Протокол испытаний</a></li>
+    <li><a href="#list-6">Спецификация</a></li>
+    <li><a href="#list-7">Маршрутная карта</a></li>
+  </ol>
+  <button type="button" id="strip-btn" aria-expanded="false" aria-controls="sheet-list">
+    <span class="s-des-cell"><span class="s-des">MOSST.ВИМ.012</span></span>
+    <span><span class="s-name" id="s-name">Общий вид</span></span>
+    <span class="s-no"><small>лист</small><span id="s-no">1 / 7</span></span>
+  </button>
+</nav>
+
+<script>
+(() => {
+  'use strict';
+  const reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v, d) => v.toFixed(d).replace('.', ',');
+
+  /* --- газодинамика: те же соотношения, что в Cem.Physics --- */
+  const area = (M, g) => Math.pow((2 / (g + 1)) * (1 + (g - 1) / 2 * M * M), (g + 1) / (2 * (g - 1))) / M;
+  function machSup(eps, g) {
+    let lo = 1, hi = 50;
+    for (let i = 0; i < 200; i++) { const m = 0.5 * (lo + hi); if (area(m, g) < eps) lo = m; else hi = m; }
+    return 0.5 * (lo + hi);
+  }
+  function nu(M, g) { const a = Math.sqrt((g + 1) / (g - 1)), b = Math.sqrt(Math.max(0, M * M - 1)); return a * Math.atan(b / a) - Math.atan(b); }
+  function cfVac(eps, g, M) {
+    const pr = Math.pow(1 + (g - 1) / 2 * M * M, -g / (g - 1));
+    const mom = Math.sqrt(2 * g * g / (g - 1) * Math.pow(2 / (g + 1), (g + 1) / (g - 1)) * (1 - Math.pow(pr, (g - 1) / g)));
+    return mom + pr * eps;
+  }
+  const cfInf = (g) => Math.sqrt(2 * g * g / (g - 1) * Math.pow(2 / (g + 1), (g + 1) / (g - 1)));
+
+  /* Анджелино: (r/Rₑ)² = 1 − (A/A*)·M·sin α / ε, α = νₑ − ν + μ; длина характеристики от кромки
+     l = (A/A*)·M / (ε·(1 + r)) — та же формула без деления на sin α, устойчивая при νₑ = 90°. */
+  function contour(eps, g) {
+    const Me = machSup(eps, g), nue = nu(Me, g), N = 180, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const M = i === N ? Me : 1 + (Me - 1) * Math.pow(i / N, 1.8);
+      const mu = Math.asin(1 / M), al = nue - nu(M, g) + mu, A = area(M, g);
+      const r = i === N ? 0 : Math.sqrt(Math.max(0, 1 - A * M * Math.sin(al) / eps));
+      const l = A * M / (eps * (1 + r));
+      pts.push({ x: l * Math.cos(al), r, M });
+    }
+    return { Me, nue, pts, L: Math.sqrt(Me * Me - 1) };
+  }
+
+  /* --- чертёж --- */
+  const S = 150, X0 = 238, Y0 = 270;
+  const X = (x) => X0 + x * S, YU = (r) => Y0 - r * S, YD = (r) => Y0 + r * S;
+  const layer = $('dwg-layer');
+  function node(tag, attrs, parent) {
+    const e = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    (parent || layer).appendChild(e);
+    return e;
+  }
+  const poly = (pts, Y) => pts.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ',' + Y(p[1]).toFixed(1)).join(' ');
+  function text(x, y, s, cls, anchor, rot) {
+    const t = node('text', { x: x.toFixed(1), y: y.toFixed(1), class: cls || '', 'text-anchor': anchor || 'start' });
+    if (rot) t.setAttribute('transform', `rotate(${rot} ${x.toFixed(1)} ${y.toFixed(1)})`);
+    t.textContent = s;
+    return t;
+  }
+  function leader(x1, y1, x2, y2, s, anchor) {
+    node('path', { d: `M${x1.toFixed(1)},${y1.toFixed(1)} L${x2.toFixed(1)},${y2.toFixed(1)} L${(x2 + (anchor === 'end' ? -1 : 1) * 6).toFixed(1)},${y2.toFixed(1)}`, class: 'thin' });
+    node('circle', { cx: x1.toFixed(1), cy: y1.toFixed(1), r: 2.6, class: 'arr' });
+    text(x2 + (anchor === 'end' ? -10 : 10), y2 + 6, s, 'lbl-2', anchor || 'start');
+  }
+
+  let firstDraw = true;
+  function draw() {
+    const v = +$('eps').value, eps = 4 * Math.pow(150 / 4, v / 1000);
+    const g = +$('gam').value, cut = $('len-cut').checked;
+    $('eps-o').textContent = eps < 100 ? fmt(eps, 1) : fmt(eps, 0);
+    $('gam-o').textContent = fmt(g, 2);
+
+    layer.textContent = '';
+    const pens = [];
+    const pen = (d) => { const e = node('path', { d, class: 'thick' }); pens.push(e); return e; };
+
+    const c = contour(eps, g);
+    const xcut = cut ? 0.2 * c.L : c.L;
+    const kept = [], rest = [];
+    for (let i = 0; i < c.pts.length; i++) {
+      const p = c.pts[i];
+      if (p.x <= xcut + 1e-9) { kept.push([p.x, p.r]); continue; }
+      if (!rest.length) {
+        const a = c.pts[i - 1], t = (xcut - a.x) / (p.x - a.x), q = [xcut, a.r + t * (p.r - a.r)];
+        kept.push(q); rest.push(q);
+      }
+      rest.push([p.x, p.r]);
+    }
+    const th = kept[0];
+    const nue = c.nue, d = [Math.cos(nue), -Math.sin(nue)], n = [Math.sin(nue), Math.cos(nue)];
+    const Pl = [0, 1], Pt = th, duct = 0.5;
+    const Pl2 = [Pl[0] - duct * d[0], Pl[1] - duct * d[1]];
+    const Pt2 = [Pt[0] - duct * d[0], Pt[1] - duct * d[1]];
+    const xs = Math.min(Pt2[0], Pt[0]) - 0.28;
+    const plug = [[xs, 0], [xs, Pt2[1]], Pt2, Pt].concat(kept.slice(1));
+    if (cut) plug.push([xcut, 0]);
+    const cowl = [Pl, Pl2, [Pl2[0] + 0.16 * n[0], Pl2[1] + 0.16 * n[1]], [Pl[0] + 0.05 * n[0], Pl[1] + 0.05 * n[1]], Pl];
+
+    // половина разреза: штриховка
+    node('path', { d: poly(plug.concat([[xs, 0]]), YU) + ' Z', class: 'body' });
+    node('path', { d: poly(cowl, YU) + ' Z', class: 'body' });
+    // веер волн разрежения и звуковая линия
+    const K = 9;
+    for (let k = 1; k <= K; k++) {
+      const Mk = 1 + (c.Me - 1) * k / K;
+      const p = c.pts.find((q) => q.M >= Mk - 1e-12);
+      if (!p || p.x > xcut + 1e-9) break;
+      node('path', { d: poly([Pl, [p.x, p.r]], YU), class: k === K ? 'fan last' : 'fan' });
+    }
+    node('path', { d: poly([Pl, Pt], YU), class: 'sonic' });
+    // контуры: сверху разрез, снизу вид
+    pen(poly(plug, YU)); pen(poly(cowl, YU));
+    pen(poly(plug, YD)); pen(poly(cowl, YD));
+    if (cut && rest.length > 1) {
+      node('path', { d: poly(rest, YU), class: 'hidden' });
+      node('path', { d: poly(rest, YD), class: 'hidden' });
+    }
+    node('path', { d: `M14,${Y0} L988,${Y0}`, class: 'axis' });
+
+    // размер Rₑ
+    const xd = X(Math.min(xs, Pl2[0])) - 30;
+    node('path', { d: `M${X(-0.02)},${YU(1)} L${xd - 10},${YU(1)}`, class: 'thin' });
+    node('path', { d: `M${xd},${Y0} L${xd},${YU(1)}`, class: 'thin', 'marker-start': 'url(#ar)', 'marker-end': 'url(#ar)' });
+    text(xd - 9, (Y0 + YU(1)) / 2, 'Rₑ', 'dim', 'middle', -90);
+    // размер L
+    let maxR = 1;
+    plug.concat(cowl).forEach((p) => { if (p[1] > maxR) maxR = p[1]; });
+    const yL = Math.min(YD(maxR) + 42, 540);
+    const xe = X(xcut), span = xe - X(0);
+    node('path', { d: `M${X(0)},${YD(1) + 8} L${X(0)},${yL + 9}`, class: 'thin' });
+    node('path', { d: `M${xe},${Y0 + 8} L${xe},${yL + 9}`, class: 'thin' });
+    node('path', { d: `M${X(0)},${yL} L${xe},${yL}`, class: 'thin', 'marker-start': 'url(#ar)', 'marker-end': 'url(#ar)' });
+    const lText = 'L = ' + fmt(xcut, 2) + '·Rₑ';
+    if (span > 190) text((X(0) + xe) / 2, yL - 8, lText, 'dim', 'middle');
+    else text(xe + 12, yL + 7, lText, 'dim', 'start');
+
+    // надписи
+    if (!cut) text(X(c.L * 0.5) + 6, YU(0.5) - 14, 'Mₑ', 'red', 'start');
+    const cw = [Pl2[0] + 0.16 * n[0], Pl2[1] + 0.16 * n[1]];
+    leader(X(cw[0]), YU(cw[1]), X(cw[0]) + 40, Math.max(28, YU(cw[1]) - 44), 'обечайка', 'start');
+    const xb = Math.min(xcut * 0.45, 1.6), pb = kept.reduce((m, p) => (Math.abs(p[0] - xb) < Math.abs(m[0] - xb) ? p : m), kept[0]);
+    leader(X(pb[0]), YU(pb[1] * 0.45), X(Math.max(pb[0], 0.9)) + 40, YU(1.24), 'центральное тело, разрез', 'start');
+    text(986, 36, 'ε = ' + (eps < 100 ? fmt(eps, 1) : fmt(eps, 0)) + '   γ = ' + fmt(g, 2), 'lbl-2', 'end');
+
+    // «графопостроитель» при первой загрузке
+    if (firstDraw && !reduce) {
+      pens.forEach((e, i) => {
+        const len = e.getTotalLength();
+        e.style.strokeDasharray = len; e.style.strokeDashoffset = len;
+        e.style.animation = `plot 1.5s ${0.15 * i}s ease-out forwards`;
+      });
+    }
+    firstDraw = false;
+
+    // числа
+    $('o-me').textContent = fmt(c.Me, 2);
+    $('o-nu').textContent = fmt(c.nue * 180 / Math.PI, 1) + '°';
+    $('o-l').textContent = cut ? fmt(xcut, 2) + ' из ' + fmt(c.L, 2) : fmt(c.L, 2);
+    const h = Math.hypot(th[0], 1 - th[1]);
+    $('o-h').textContent = fmt(h, 4);
+    const cf = cfVac(eps, g, c.Me);
+    $('o-cf').textContent = fmt(cf, 3) + '\u00a0(' + fmt(100 * cf / cfInf(g), 1) + '\u00a0%)';
+    $('o-print').textContent = 'Канал печати In718 — не меньше 1,0 мм по нижнему краю датума. Горло такой ширины печатается при Rₑ ≥ ' + Math.ceil(1.0 / h) + ' мм.';
+  }
+  ['eps', 'gam'].forEach((id) => $(id).addEventListener('input', draw));
+  document.querySelectorAll('input[name=len]').forEach((r) => r.addEventListener('change', draw));
+  draw();
+
+  /* --- схема структурная --- */
+  const BLK = {
+    q: ['Cem.Quantities', '26 типов физических величин в СИ — от длины до удельной прочности. Каждый со своими фабриками с единицей в имени; оператор есть, только если он осмыслен.'],
+    c: ['Cem.Contracts', 'Общий язык слоёв: требование, сигналы поиску, Outcome, домены осей выбора.'],
+    p: ['Cem.Physics', 'Только чистые функции: изэнтропа, идеальное сопло, течение Прандтля—Майера, кольцевое горло, распространение полос.'],
+    d: ['Cem.Data', 'Справочник: материалы и процесс L-PBF, термохимия NASA CEA, плотности компонентов, каталоги баков, батарей, приводов и ламинатов. У каждого числа — источник.'],
+    x: ['Cem.Discrete', 'Девять осей выбора, правила совместимости, дуговая согласованность и топология установки.'],
+    s: ['Cem.Screening', 'Вторая ступень лестницы: нижние границы стартовой массы и поиск по давлению в камере. Она не знает о третьей ступени, иначе её граница зависела бы от того, что она ограничивает.'],
+    m: ['Cem.Components', 'Узлы установки — камера, плуг, баки, подача — со своими портами. Запланировано.'],
+    v: ['Cem.Solver', 'Связанный сайзинг по станциям выработки: тепло, прочность, гидравлика. Запланировано.'],
+    h: ['Cem.Search', 'Поиск по пространству схем; построение геометрии вызывает только для финалистов. Запланировано.'],
+    g: ['Cem.Geometry', 'Печатаемое тело на PicoGK. Единственный проект, который видит ядро геометрии. Запланировано.'],
+    r: ['Cem.Report', 'Отчёт: провенанс решения, связавшие ограничения, полосы. Запланировано.'],
+    a: ['Cem.App', 'Вход требования и выдача финалистов. Запланировано.']
+  };
+  const BUILT = new Set(['q', 'c', 'p', 'd', 'x', 's']);
+  const EDGES = [['c','q'],['p','c'],['d','c'],['x','c'],['s','p'],['s','d'],['s','x'],['m','p'],['m','d'],['v','m'],['h','s'],['h','v'],['h','g'],['r','h'],['a','h']];
+  const scheme = $('scheme');
+  function drawLinks() {
+    const svg = scheme.querySelector('svg.links');
+    const box = scheme.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${box.width.toFixed(1)} ${box.height.toFixed(1)}`);
+    svg.textContent = '';
+    const rect = (k) => {
+      const r = $('b-' + k).getBoundingClientRect();
+      return { l: r.left - box.left, r: r.right - box.left, t: r.top - box.top, b: r.bottom - box.top, cx: (r.left + r.right) / 2 - box.left, cy: (r.top + r.bottom) / 2 - box.top, w: r.width };
+    };
+    for (const [from, to] of EDGES) {
+      const a = rect(from), b = rect(to), plan = !(BUILT.has(from) && BUILT.has(to));
+      let x1, y1, x2, y2;
+      if (Math.abs(a.cy - b.cy) < 4) { y1 = y2 = a.cy; if (a.cx < b.cx) { x1 = a.r; x2 = b.l; } else { x1 = a.l; x2 = b.r; } }
+      else {
+        const shift = Math.max(-0.3, Math.min(0.3, (a.cx - b.cx) / Math.max(1, box.width))) * b.w;
+        x1 = a.cx; y1 = a.b; x2 = b.cx + shift; y2 = b.t;
+      }
+      const line = document.createElementNS(SVGNS, 'path');
+      line.setAttribute('d', `M${x1.toFixed(1)},${y1.toFixed(1)} L${x2.toFixed(1)},${y2.toFixed(1)}`);
+      if (plan) line.setAttribute('class', 'plan');
+      svg.appendChild(line);
+      const ang = Math.atan2(y2 - y1, x2 - x1), s = 9;
+      const ah = document.createElementNS(SVGNS, 'path');
+      ah.setAttribute('d', `M${x2.toFixed(1)},${y2.toFixed(1)} L${(x2 - s * Math.cos(ang - 0.4)).toFixed(1)},${(y2 - s * Math.sin(ang - 0.4)).toFixed(1)} L${(x2 - s * Math.cos(ang + 0.4)).toFixed(1)},${(y2 - s * Math.sin(ang + 0.4)).toFixed(1)} Z`);
+      ah.setAttribute('class', plan ? 'ah plan' : 'ah');
+      svg.appendChild(ah);
+    }
+  }
+  scheme.querySelectorAll('.blk').forEach((b) => b.addEventListener('click', () => {
+    scheme.querySelectorAll('.blk').forEach((o) => o.setAttribute('aria-pressed', 'false'));
+    b.setAttribute('aria-pressed', 'true');
+    const [name, role] = BLK[b.dataset.k];
+    $('co-name').textContent = name;
+    $('co-role').textContent = role;
+  }));
+  if ('ResizeObserver' in window) new ResizeObserver(() => drawLinks()).observe(scheme);
+  window.addEventListener('resize', drawLinks);
+  drawLinks();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawLinks);
+
+  /* --- форма 2а: лист в поле зрения и перечень листов --- */
+  const sheets = Array.from(document.querySelectorAll('.sheet'));
+  const links = Array.from(document.querySelectorAll('#sheet-list a'));
+  function setCurrent(i) {
+    if (i < 0) return;
+    $('s-name').textContent = sheets[i].dataset.name;
+    $('s-no').textContent = (i + 1) + ' / ' + sheets.length;
+    links.forEach((a, j) => a.setAttribute('aria-current', j === i ? 'true' : 'false'));
+  }
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) setCurrent(sheets.indexOf(e.target)); });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    sheets.forEach((s) => io.observe(s));
+  }
+  const btn = $('strip-btn'), list = $('sheet-list');
+  const toggle = (open) => { list.hidden = !open; btn.setAttribute('aria-expanded', String(open)); };
+  btn.addEventListener('click', () => toggle(list.hidden));
+  links.forEach((a) => a.addEventListener('click', () => toggle(false)));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggle(false); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.strip')) toggle(false); });
+})();
+</script>
+
+</body></html>
