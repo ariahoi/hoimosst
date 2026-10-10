@@ -1,0 +1,934 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>MOSST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a schlieren window runs the full width of the page as the opening, then three working scenes
+   (поле решений, принцип границы, печать слоями) each split into stage | commentary, collapsing to one column on phones.
+   Look: Toepler schlieren photograph — silver field, bodies as ink silhouettes, flow drawn as density streaks;
+   one cobalt "knife-edge" accent for what the reader controls and what survives. */
+:root {
+  --field: #D7DBD4;      /* серебряное поле шлирен-снимка */
+  --field-2: #CBD0C8;    /* подложка сцен */
+  --ink: #0E1312;        /* силуэты, текст */
+  --ink-2: #4A534F;      /* вторичный текст, тонкие линии */
+  --rule: #A3ABA5;       /* границы, пунктир */
+  --signal: #1C44C0;     /* кобальтовый фильтр: управление и то, что выжило */
+  --signal-soft: rgba(28, 68, 192, .16);
+  --f-display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --f-text: "Golos Text", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --gutter: clamp(16px, 4vw, 48px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --field: #101413; --field-2: #171C1A; --ink: #E1E6E0; --ink-2: #9DA7A1; --rule: #3A433F;
+    --signal: #7F9DFF; --signal-soft: rgba(127, 157, 255, .18); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --field: #101413; --field-2: #171C1A; --ink: #E1E6E0; --ink-2: #9DA7A1; --rule: #3A433F;
+  --signal: #7F9DFF; --signal-soft: rgba(127, 157, 255, .18); color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--field); color: var(--ink);
+  font: 400 17px/1.55 var(--f-text);
+  padding-inline: var(--gutter); padding-block: 0 64px;
+  -webkit-font-smoothing: antialiased; overflow-x: hidden;
+}
+.page { max-width: 1280px; margin-inline: auto; display: grid; }
+h1, h2, h3 { margin: 0; font-family: var(--f-display); text-wrap: balance; }
+p { margin: 0; }
+a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+
+/* --- верхняя строка --- */
+.top {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 24px;
+  padding-block: 18px; border-bottom: 1px solid var(--rule); font-size: 14px; color: var(--ink-2);
+}
+.top b { font: 700 15px/1 var(--f-display); color: var(--ink); letter-spacing: .02em; }
+.top .live { display: inline-flex; align-items: center; gap: 8px; }
+.top .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 0 var(--signal-soft); animation: beat 2.4s infinite; }
+@keyframes beat { 60% { box-shadow: 0 0 0 9px transparent; } }
+
+/* --- первый экран --- */
+.hero { display: grid; gap: 22px; padding-block: 40px 72px; }
+.hero-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 48px; align-items: end; }
+h1 { font-size: clamp(76px, 15vw, 214px); font-weight: 800; line-height: .82; letter-spacing: -.045em; }
+.hero-copy { display: grid; gap: 14px; max-width: 52ch; padding-bottom: 8px; }
+.hero-copy .what { font: 500 19px/1.3 var(--f-display); letter-spacing: -.01em; }
+@media (max-width: 860px) { .hero-head { grid-template-columns: minmax(0, 1fr); } }
+
+.tunnel {
+  position: relative; height: clamp(320px, 50vw, 620px); max-width: 100%;
+  background: var(--field-2); overflow: hidden; touch-action: pan-y; cursor: ew-resize;
+  border-block: 1px solid var(--rule);
+}
+@media (pointer: fine) { .tunnel { cursor: crosshair; } }
+.tunnel canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tunnel .hud {
+  position: absolute; right: 14px; top: 12px; text-align: right; display: grid; gap: 2px;
+  font: 400 13px/1.35 var(--f-mono); color: var(--ink-2); pointer-events: none;
+}
+.tunnel .hud b { font-weight: 500; color: var(--signal); }
+.tunnel .hint { position: absolute; left: 14px; bottom: 10px; font-size: 13px; color: var(--ink-2); pointer-events: none; }
+
+.hero-ctl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 28px 56px; align-items: start; }
+@media (max-width: 900px) { .hero-ctl { grid-template-columns: minmax(0, 1fr); } }
+.sliders { display: grid; gap: 16px; }
+.sl { display: grid; gap: 4px; }
+.sl .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px; }
+.sl output { font: 500 15px/1 var(--f-mono); }
+.sl .ends { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--ink-2); }
+input[type=range] { width: 100%; accent-color: var(--signal); margin: 2px 0; }
+
+.seg { display: inline-flex; border: 1px solid var(--ink); justify-self: start; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 7px 14px; cursor: pointer; font-size: 14.5px; }
+.seg label + input + label { border-left: 1px solid var(--ink); }
+.seg input:checked + label { background: var(--ink); color: var(--field); }
+.seg input:focus-visible + label { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.readout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px 20px; margin: 0; }
+.readout div { display: grid; gap: 4px; align-content: start; border-top: 1px solid var(--rule); padding-top: 8px; min-width: 0; }
+.readout dt { font-size: 13.5px; color: var(--ink-2); line-height: 1.25; }
+.readout dd { margin: 0; font: 500 19px/1.1 var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.readout dd.sig { color: var(--signal); }
+@media (max-width: 560px) { .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fineprint { font-size: 13.5px; color: var(--ink-2); max-width: 70ch; grid-column: 1 / -1; }
+
+/* --- сцены --- */
+.scene { padding-block: 84px; border-top: 1px solid var(--rule); display: grid; gap: 40px; }
+.scene-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 48px; align-items: end; }
+.scene-head h2 { font-size: clamp(30px, 4.4vw, 56px); font-weight: 700; line-height: 1; letter-spacing: -.03em; }
+.scene-head p { max-width: 60ch; }
+@media (max-width: 860px) { .scene-head { grid-template-columns: minmax(0, 1fr); } }
+
+/* поле решений */
+.sieve-grid { display: grid; grid-template-columns: minmax(0, 576px) minmax(0, 1fr); gap: 32px 56px; align-items: start; }
+@media (max-width: 960px) { .sieve-grid { grid-template-columns: minmax(0, 1fr); } }
+.plate { background: var(--field-2); padding: 10px; border: 1px solid var(--rule); max-width: 100%; }
+.plate canvas { display: block; width: 100%; height: auto; aspect-ratio: 576 / 648; max-width: 100%; }
+.plate figcaption { font-size: 13px; color: var(--ink-2); padding-top: 8px; }
+.plate { margin: 0; }
+.sieve-side { display: grid; gap: 24px; min-width: 0; }
+.count { font: 800 clamp(54px, 8.4vw, 116px)/.9 var(--f-display); letter-spacing: -.045em; font-feature-settings: "tnum"; white-space: nowrap; }
+.count-sub { font-size: 15px; color: var(--ink-2); margin-top: -12px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--ink); counter-reset: st; }
+.steps li { border-bottom: 1px solid var(--rule); }
+.steps button {
+  all: unset; box-sizing: border-box; width: 100%; cursor: pointer; padding: 11px 4px;
+  display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: baseline;
+}
+.steps button::before { counter-increment: st; content: counter(st); font: 500 14px/1 var(--f-mono); color: var(--ink-2); }
+.steps .lbl { font-size: 17px; }
+.steps .n { font: 400 14px/1 var(--f-mono); color: var(--ink-2); }
+.steps button[aria-pressed="true"] .lbl { font-weight: 600; }
+.steps button[aria-pressed="true"]::before, .steps button[aria-pressed="true"] .n { color: var(--signal); }
+.steps button:hover .lbl { text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 4px; }
+.steps button:focus-visible { outline: 2px solid var(--signal); outline-offset: -2px; }
+.stage-text { min-height: 7.5em; max-width: 56ch; display: grid; gap: 10px; }
+.stage-text ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+
+/* граница */
+.bound-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 32px 56px; align-items: start; }
+@media (max-width: 960px) { .bound-grid { grid-template-columns: minmax(0, 1fr); } }
+.bwrap { overflow-x: auto; max-width: 100%; }
+#bsvg { display: block; width: 100%; min-width: 520px; height: auto; touch-action: pan-y; cursor: ew-resize; user-select: none; }
+#bsvg text { font-family: var(--f-mono); font-size: 12px; fill: var(--ink-2); }
+#bsvg .rail { stroke: var(--rule); stroke-width: 1; }
+#bsvg .span { stroke: var(--ink-2); stroke-width: 1.2; stroke-dasharray: 3 4; }
+#bsvg .bnd { fill: var(--ink); }
+#bsvg .tru { fill: var(--field-2); stroke: var(--ink-2); stroke-width: 1.4; }
+#bsvg .est { fill: var(--field-2); stroke: var(--ink); stroke-width: 1.4; }
+#bsvg .row { transition: opacity .35s ease; }
+#bsvg .row.cut { opacity: .22; }
+#bsvg .row.best text { fill: var(--signal); }
+#bsvg .row.best .tru { stroke: var(--signal); fill: var(--signal); }
+#bsvg .row.lost { opacity: .9; }
+#bsvg .row.lost .tru { stroke: var(--signal); fill: var(--signal-soft); }
+#bsvg .inc { stroke: var(--signal); stroke-width: 2; }
+#bsvg .inc-h { fill: var(--signal); }
+#bsvg .inc-t { fill: var(--signal); font-size: 12.5px; }
+#bsvg .axis { stroke: var(--ink-2); stroke-width: 1; }
+#bsvg .est-g { transition: opacity .3s ease; }
+.bside { display: grid; gap: 20px; min-width: 0; }
+.verdict { font: 500 21px/1.3 var(--f-display); letter-spacing: -.01em; min-height: 3.9em; }
+.verdict.bad { color: var(--signal); }
+.legend { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 6px 10px; font-size: 14.5px; color: var(--ink-2); align-items: center; margin: 0; }
+.legend dt { display: grid; place-items: center; }
+.legend dd { margin: 0; }
+.formula {
+  font: 400 14.5px/1.6 var(--f-mono); padding: 14px 0 0; border-top: 1px solid var(--rule);
+  overflow-x: auto; white-space: nowrap; max-width: 100%;
+}
+.proof { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+.proof div { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.proof b { font: 700 clamp(28px, 3.6vw, 44px)/1 var(--f-display); letter-spacing: -.03em; font-feature-settings: "tnum"; }
+.proof span { font-size: 15px; color: var(--ink-2); line-height: 1.4; }
+@media (max-width: 860px) { .proof { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* печать слоями */
+.build-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 32px 56px; align-items: start; }
+@media (max-width: 960px) { .build-grid { grid-template-columns: minmax(0, 1fr); } }
+.stack { display: grid; gap: 3px; min-width: 0; }
+.layer {
+  all: unset; box-sizing: border-box; cursor: pointer; width: 100%;
+  display: grid; grid-template-columns: 34px minmax(70px, 1fr) minmax(0, 1.7fr) 56px; gap: 12px; align-items: center;
+  padding: 3px 0; min-height: 34px;
+}
+.layer .k { font: 500 13px/1 var(--f-mono); color: var(--ink-2); text-align: right; }
+.layer .slab {
+  height: 22px; position: relative; overflow: hidden;
+  background: repeating-linear-gradient(var(--ang), var(--ink) 0 1.2px, transparent 1.2px 4.5px);
+  opacity: .78;
+}
+.layer .t { font-size: 15px; line-height: 1.25; min-width: 0; }
+.layer .t small { display: block; font: 400 12px/1.3 var(--f-mono); color: var(--ink-2); }
+.layer .c { font: 400 13px/1 var(--f-mono); color: var(--ink-2); text-align: right; }
+.layer:hover .t, .layer[aria-pressed="true"] .t { color: var(--signal); }
+.layer[aria-pressed="true"] .slab { opacity: 1; }
+.layer:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.layer.future .slab {
+  opacity: 1; border: 1px dashed var(--rule);
+  background: radial-gradient(circle, var(--rule) .9px, transparent 1.3px) 0 0 / 5px 5px;
+}
+.layer.future .t { color: var(--ink-2); }
+.layer.active .slab { opacity: 1; background: radial-gradient(circle, var(--rule) .9px, transparent 1.3px) 0 0 / 5px 5px; }
+.layer.active .slab::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 0;
+  background: repeating-linear-gradient(var(--ang), var(--signal) 0 1.2px, transparent 1.2px 4.5px);
+  animation: melt 7s linear infinite;
+}
+.layer.active .laser {
+  position: absolute; top: 50%; left: 0; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;
+  background: var(--field); box-shadow: 0 0 0 2px var(--signal), 0 0 14px 5px var(--signal-soft);
+  animation: melt-x 7s linear infinite, scan-y .32s ease-in-out infinite alternate;
+}
+@keyframes melt { to { width: 100%; } }
+@keyframes melt-x { to { left: 100%; } }
+@keyframes scan-y { from { transform: translateY(-7px); } to { transform: translateY(7px); } }
+.stack.fusing .layer.done .slab { animation: fuse .7s ease-out both; animation-delay: calc(var(--i) * 75ms); }
+@keyframes fuse { 0% { opacity: 1; box-shadow: inset 0 0 0 30px var(--signal-soft), 0 0 12px var(--signal-soft); } 100% { opacity: .78; box-shadow: none; } }
+.plateform {
+  margin-top: 6px; padding: 9px 14px; background: var(--ink); color: var(--field-2);
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 20px;
+  font: 500 12px/1.2 var(--f-mono); letter-spacing: .18em; text-transform: uppercase;
+}
+.plateform span:nth-child(2) { opacity: .85; }
+.plateform span:last-child { color: var(--signal); }
+.top .by { color: var(--ink); }
+.top .by em { font-style: normal; font-family: var(--f-mono); color: var(--signal); margin-left: 6px; }
+.plateform-l { font-size: 13px; color: var(--ink-2); padding-top: 6px; }
+@media (max-width: 600px) {
+  .layer { grid-template-columns: 26px 54px minmax(0, 1fr); }
+  .layer .c { display: none; }
+}
+.panel { position: sticky; top: calc(20px + env(safe-area-inset-top, 0px)); display: grid; gap: 14px; border-top: 2px solid var(--ink); padding-top: 16px; min-width: 0; }
+.panel h3 { font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.panel .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 14px/1.3 var(--f-mono); color: var(--ink-2); }
+.panel .state { color: var(--signal); }
+.cycle { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.cycle li { border: 1px solid var(--ink-2); padding: 4px 10px; font-size: 14px; }
+.cycle li:last-child { border-color: var(--signal); color: var(--signal); }
+
+footer { border-top: 1px solid var(--rule); padding-top: 22px; display: flex; flex-wrap: wrap; gap: 10px 32px; font-size: 14px; color: var(--ink-2); }
+footer .by-foot { color: var(--ink); margin-left: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .top .live i, .layer.active .slab::before, .layer.active .laser, .stack.fusing .layer.done .slab { animation: none !important; }
+  .layer.active .slab::before { width: 55%; }
+  .layer.active .laser { left: 55%; }
+}
+</style>
+
+<div class="page">
+  <header class="top">
+    <b>MOSST</b>
+    <span class="by">Yaroslav Rustamov <em>Hoi</em></span>
+    <span class="live"><i aria-hidden="true"></i>Принято 12 инкрементов, 1459 тестов зелёные. Состояние на 08.10.2026</span>
+  </header>
+
+  <!-- первый экран: шлирен-окно -->
+  <section class="hero" aria-labelledby="h1">
+    <div class="hero-head">
+      <h1 id="h1">MOSST</h1>
+      <div class="hero-copy">
+        <p class="what">Модель малой двигательной установки с аэроспайком, которая выбирает схему сама</p>
+        <p class="muted">Она подбирает пару топлив, материал, подачу и вариант плуга, считает размеры и строит деталь для печати. При заданном полном импульсе ищет наименьшую стартовую массу. Габарит, ресурс, тепло в борт, пиковая мощность и минимальный импульс включения — жёсткие ограничения, а не слагаемые взвешенной суммы.</p>
+      </div>
+    </div>
+
+    <div class="tunnel" id="tunnel">
+      <canvas id="cv-back" aria-hidden="true"></canvas>
+      <canvas id="cv-front" role="img" aria-label="Центральное тело аэроспайка в разрезе и струя за ним. Веер волн разрежения от кромки обечайки, граница струи меняет наклон с давлением среды."></canvas>
+      <div class="hud" id="hud" aria-hidden="true"></div>
+      <p class="hint" id="hint">Ведите по полю влево и вправо, чтобы менять степень расширения</p>
+    </div>
+
+    <div class="hero-ctl">
+      <div class="sliders">
+        <label class="sl" for="eps"><span class="row"><span>Степень расширения ε</span><output id="eps-o" for="eps">25,0</output></span>
+          <input type="range" id="eps" min="0" max="1000" step="1" value="677"></label>
+        <label class="sl" for="pa"><span class="row"><span>Давление среды p<sub>a</sub>/p<sub>c</sub></span><output id="pa-o" for="pa">—</output></span>
+          <input type="range" id="pa" min="0" max="1000" step="1" value="0">
+          <span class="ends"><span>вакуум</span><span>стенд на уровне моря при p<sub>c</sub> = 10 бар</span></span></label>
+        <label class="sl" for="gam"><span class="row"><span>Показатель адиабаты γ</span><output id="gam-o" for="gam">1,20</output></span>
+          <input type="range" id="gam" min="1.12" max="1.40" step="0.01" value="1.20"></label>
+        <div class="seg" role="radiogroup" aria-label="Длина плуга">
+          <input type="radio" name="len" id="len-full" value="full" checked><label for="len-full">Полный плуг</label>
+          <input type="radio" name="len" id="len-cut" value="cut"><label for="len-cut">Укороченный до 20 %</label>
+        </div>
+      </div>
+      <dl class="readout" aria-live="polite">
+        <div><dt>Мах на срезе M<sub>e</sub></dt><dd id="o-me">—</dd></div>
+        <div><dt>Поворот потока ν<sub>e</sub></dt><dd id="o-nu">—</dd></div>
+        <div><dt>Длина плуга L / R<sub>e</sub></dt><dd id="o-l">—</dd></div>
+        <div><dt>C<sub>F</sub> в вакууме</dt><dd id="o-cfv">—</dd></div>
+        <div><dt>Режим</dt><dd id="o-reg" class="sig">—</dd></div>
+        <div><dt>Наклон границы струи у кромки</dt><dd id="o-th">—</dd></div>
+        <div><dt>C<sub>F</sub> аэроспайка при p<sub>a</sub></dt><dd id="o-cfa">—</dd></div>
+        <div><dt>C<sub>F</sub> колокола того же ε</dt><dd id="o-cfb">—</dd></div>
+        <p class="fineprint">Контур — приближённый метод Анджелино, те же соотношения, что в <span class="num">Cem.Physics</span>. Сравнение с колоколом идеализированное: аэроспайк расширяется до давления среды, колокол перерасширен и отрывается по критерию Саммерфилда, p<sub>отр</sub> ≈ 0,4·p<sub>a</sub>. В вакууме граница струи разворачивается далеко наружу, поэтому для аппарата важен тепловой поток в борт.</p>
+      </dl>
+    </div>
+  </section>
+
+  <!-- поле решений -->
+  <section class="scene" aria-labelledby="h-sieve" id="sieve">
+    <div class="scene-head">
+      <h2 id="h-sieve">Каждая точка — одна конструкция</h2>
+      <p class="muted">Девять осей выбора дают 373 248 дискретных сочетаний, и у каждого есть ещё непрерывные размеры. Перебрать всё нельзя, поэтому модель отсеивает лестницей: каждая ступень дороже и точнее предыдущей и видит только тех, кого та пропустила.</p>
+    </div>
+    <div class="sieve-grid">
+      <figure class="plate">
+        <canvas id="sieve-cv" width="576" height="648" role="img" aria-label="Поле из 373 248 точек, по одной на сочетание. По шагам остаются 2 592, затем 216."></canvas>
+        <figcaption>576 × 648 точек. Раскладка по полю схематичная, количество точек настоящее.</figcaption>
+      </figure>
+      <div class="sieve-side">
+        <div class="count" id="count" aria-live="polite">373 248</div>
+        <p class="count-sub" id="count-sub">сочетаний в поле</p>
+        <ol class="steps" id="steps">
+          <li><button type="button" data-s="0" aria-pressed="true"><span class="lbl">Все сочетания</span><span class="n">373 248</span></button></li>
+          <li><button type="button" data-s="1" aria-pressed="false"><span class="lbl">Выбраны три оси</span><span class="n">2 592</span></button></li>
+          <li><button type="button" data-s="2" aria-pressed="false"><span class="lbl">Пять правил совместимости</span><span class="n">216</span></button></li>
+          <li><button type="button" data-s="3" aria-pressed="false"><span class="lbl">На вторую ступень</span><span class="n">216</span></button></li>
+        </ol>
+        <div class="stage-text" id="stage-text"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- граница -->
+  <section class="scene" aria-labelledby="h-bound" id="bound">
+    <div class="scene-head">
+      <h2 id="h-bound">Граница, а не оценка</h2>
+      <p class="muted">Дешёвая ступень обязана давать оптимистичную границу: настоящая конструкция не может оказаться легче её. Вариант уходит, только если даже его граница хуже уже найденной конструкции. Если вместо границы взять оценку, можно выбросить лучший вариант. Двигайте рекорд и переключайте режим.</p>
+    </div>
+    <div class="bound-grid">
+      <div class="bwrap"><svg id="bsvg" viewBox="0 0 640 404" role="img" aria-label="Двенадцать вариантов на оси стартовой массы: нижняя граница, оценка и настоящая масса каждого, вертикальная линия рекорда."></svg></div>
+      <div class="bside">
+        <div class="seg" role="radiogroup" aria-label="По чему отсеивать">
+          <input type="radio" name="bm" id="bm-b" value="b" checked><label for="bm-b">По границе</label>
+          <input type="radio" name="bm" id="bm-e" value="e"><label for="bm-e">По оценке</label>
+        </div>
+        <label class="sl" for="inc-r"><span class="row"><span>Рекорд — масса лучшей найденной конструкции</span><output id="inc-o" for="inc-r">50</output></span>
+          <input type="range" id="inc-r" min="42" max="95" step="1" value="50"></label>
+        <p class="verdict" id="verdict" aria-live="polite">—</p>
+        <dl class="legend">
+          <dt><svg width="12" height="16" aria-hidden="true"><rect x="4.5" y="1" width="3" height="14" fill="currentColor"/></svg></dt><dd>нижняя граница, считается дёшево</dd>
+          <dt><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></dt><dd>настоящая масса, известна только после сайзинга</dd>
+          <dt><svg width="14" height="14" aria-hidden="true"><path d="M7 1.5 12.5 7 7 12.5 1.5 7Z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></dt><dd>оценка: может ошибиться в любую сторону</dd>
+        </dl>
+        <p class="fineprint" style="grid-column:auto">Схема принципа: двенадцать условных вариантов, массы в условных единицах. Рекорд не бывает легче лучшей конструкции, потому что он сам конструкция.</p>
+        <div class="formula" aria-label="Нижняя граница стартовой массы">m₀ ≥ max( min<sub>P</sub> { I<sub>Σ</sub> / c<sub>max</sub>(P) + (a<sub>б</sub> + a<sub>г</sub>)·P } ;  I<sub>Σ</sub> / c<sub>max</sub> )</div>
+        <p class="fineprint" style="grid-column:auto">Давление в камере P — переменная, граница берёт минимум по нему. a<sub>б</sub>, a<sub>г</sub> — цена давления баков и баллона наддува по теореме о вириале, без зависимости от формы оболочки.</p>
+      </div>
+    </div>
+    <div class="proof">
+      <div><b>927 255</b><span>сравнений границы топлива с NASA CEA, нарушений ноль</span></div>
+      <div><b>0,977</b><span>ближе всего граница подошла к массе достижимой конструкции: семейство E13, 154 035 сравнений, нарушений ноль</span></div>
+      <div><b>3,1·10⁻⁷</b><span>наибольшее расхождение m₀ кода с прототипом на Python на 1152 выборах E13, исходы совпали все</span></div>
+      <div><b>52</b><span>источника в справочнике: у каждого числа документ, место и ссылка</span></div>
+    </div>
+  </section>
+
+  <!-- печать слоями -->
+  <section class="scene" aria-labelledby="h-build" id="build">
+    <div class="scene-head">
+      <h2 id="h-build">Модель печатается слоями</h2>
+      <p class="muted">Каждый слой — принятый инкремент: сборка без предупреждений, все тесты зелёные, числа совпали с прототипом, ревью без блокеров. Штриховка каждого слоя повёрнута на 67° к предыдущему, как векторы сканирования в L-PBF. Сверху — порошок, который ещё не сплавлен.</p>
+    </div>
+    <div class="build-grid">
+      <div>
+        <div class="stack" id="stack"></div>
+        <div class="plateform"><span>MOSST</span><span>Yaroslav Rustamov</span><span>Hoi</span></div>
+        <p class="plateform-l">Платформа построения с гравировкой автора. Справа — тестов в решении после приёмки слоя.</p>
+      </div>
+      <aside class="panel" aria-live="polite">
+        <div class="meta" id="p-meta"></div>
+        <h3 id="p-title">—</h3>
+        <p id="p-text">—</p>
+        <p class="muted" style="font-size:15px">Цикл инкремента</p>
+        <ol class="cycle"><li>бриф</li><li>реализация</li><li>ревью</li><li>правки</li><li>приёмка</li></ol>
+        <p class="muted" style="font-size:15px">Yaroslav Rustamov (Hoi) ставит задачи и принимает каждый инкремент. Архитектор — Claude — пишет брифы, собирает данные с источниками и делает ревью; перед выдачей бриф читает отдельный субагент-рецензент. Агент Claude Code в VS Code пишет код по брифу и прогоняет тесты.</p>
+      </aside>
+    </div>
+  </section>
+
+  <footer>
+    <span>MOSST — вычислительная инженерная модель малой ДУ с аэроспайком</span>
+    <span>C# / .NET, воксельное ядро PicoGK, термохимия NASA CEA</span>
+    <span>Брифы, ревью и справочные данные лежат в репозитории проекта</span>
+    <span class="by-foot">Yaroslav Rustamov, Hoi</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v, d) => v.toFixed(d).replace('.', ',');
+  const group = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const ease = (t) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const smooth = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+  const SUP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+  function sci(v) {
+    if (v >= 0.01) return fmt(v, 3);
+    const e = Math.floor(Math.log10(v)), m = v / Math.pow(10, e);
+    return fmt(m, 1) + '·10' + String(e).split('').map((c) => SUP[c]).join('');
+  }
+
+  /* --- токены темы --- */
+  const T = {};
+  function hexRgb(h) {
+    h = h.replace('#', '');
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    const n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function readTokens() {
+    const s = getComputedStyle(document.documentElement);
+    ['field', 'field-2', 'ink', 'ink-2', 'rule', 'signal'].forEach((k) => { T[k] = hexRgb(s.getPropertyValue('--' + k).trim() || '#000'); });
+  }
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  readTokens();
+  const themeHooks = [];
+  function themeChanged() { readTokens(); themeHooks.forEach((f) => f()); }
+  if (window.matchMedia) { const mq = matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener && mq.addEventListener('change', themeChanged); }
+  new MutationObserver(themeChanged).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  /* --- газодинамика: те же соотношения, что в Cem.Physics --- */
+  const area = (M, g) => Math.pow((2 / (g + 1)) * (1 + (g - 1) / 2 * M * M), (g + 1) / (2 * (g - 1))) / M;
+  function machSup(eps, g) { let lo = 1, hi = 60; for (let i = 0; i < 90; i++) { const m = .5 * (lo + hi); if (area(m, g) < eps) lo = m; else hi = m; } return .5 * (lo + hi); }
+  const nu = (M, g) => { const a = Math.sqrt((g + 1) / (g - 1)), b = Math.sqrt(Math.max(0, M * M - 1)); return a * Math.atan(b / a) - Math.atan(b); };
+  const pRatio = (M, g) => Math.pow(1 + (g - 1) / 2 * M * M, -g / (g - 1));
+  const machFromP = (pr, g) => Math.sqrt(Math.max(0, 2 / (g - 1) * (Math.pow(pr, -(g - 1) / g) - 1)));
+  const momCF = (pr, g) => Math.sqrt(2 * g * g / (g - 1) * Math.pow(2 / (g + 1), (g + 1) / (g - 1)) * (1 - Math.pow(pr, (g - 1) / g)));
+  /* Анджелино: (r/Rₑ)² = 1 − (A/A*)·M·sin α / ε, α = νₑ − ν + μ; l = (A/A*)·M / (ε·(1 + r)) */
+  function contour(eps, g) {
+    const Me = machSup(eps, g), nue = nu(Me, g), N = 160, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const M = i === N ? Me : 1 + (Me - 1) * Math.pow(i / N, 1.8);
+      const mu = Math.asin(1 / M), al = nue - nu(M, g) + mu, A = area(M, g);
+      const r = i === N ? 0 : Math.sqrt(Math.max(0, 1 - A * M * Math.sin(al) / eps));
+      const l = A * M / (eps * (1 + r));
+      pts.push({ x: l * Math.cos(al), r, M });
+    }
+    return { Me, nue, pts, L: Math.sqrt(Me * Me - 1) };
+  }
+
+  /* ================= ШЛИРЕН-ОКНО ================= */
+  (() => {
+    const tunnel = $('tunnel'), cb = $('cv-back'), cf = $('cv-front');
+    const bx = cb.getContext('2d'), fx = cf.getContext('2d');
+    const sEps = $('eps'), sGam = $('gam'), sPa = $('pa');
+    const st = { eps: 25, g: 1.2, pa: 1e-5, cut: false };
+    const epsFromV = (v) => 4 * Math.pow(15, v / 1000);
+    const vFromEps = (e) => 1000 * Math.log(e / 4) / Math.log(15);
+    const PA0 = 1e-5, PA1 = 0.1013;
+    const paFromV = (v) => PA0 * Math.pow(PA1 / PA0, v / 1000);
+    const vFromPa = (p) => 1000 * Math.log(p / PA0) / Math.log(PA1 / PA0);
+    let W = 0, H = 0, dpr = 1, S = 1, X0 = 0, CY = 0, G = null, gver = 0;
+    let parts = [], running = false, inView = true, last = 0, time = 0, raf = 0;
+
+    function geometry() {
+      const { eps, g, cut, pa } = st, c = contour(eps, g);
+      const xcut = cut ? 0.2 * c.L : c.L;
+      const kept = [], rest = [];
+      for (let i = 0; i < c.pts.length; i++) {
+        const p = c.pts[i];
+        if (p.x <= xcut + 1e-9) { kept.push([p.x, p.r]); continue; }
+        if (!rest.length) { const a = c.pts[i - 1], t = (xcut - a.x) / (p.x - a.x), q = [xcut, a.r + t * (p.r - a.r)]; kept.push(q); rest.push(q); }
+        rest.push([p.x, p.r]);
+      }
+      const kx = kept.slice().sort((a, b) => a[0] - b[0]);
+      const phi = Math.min(c.nue, 80 * Math.PI / 180), d = [Math.cos(phi), -Math.sin(phi)];
+      const Pl = [0, 1], Pt = kept[0], duct = 0.45;
+      const Pl2 = [Pl[0] - duct * d[0], Pl[1] - duct * d[1]], Pt2 = [Pt[0] - duct * d[0], Pt[1] - duct * d[1]];
+      const pe = pRatio(c.Me, g);
+      const Mb = Math.max(1, machFromP(pa, g));
+      const th0 = nu(Mb, g) - c.nue;
+      const thc = Math.max(-1.2, Math.min(1.31, th0));
+      const t0 = Math.tan(thc), tinf = th0 > 0 ? t0 * 0.35 : t0 * 0.05;
+      return { c, kept, kx, rest, xcut, cut, Pl, Pt, Pl2, Pt2, pe, Mb, th0, t0, tinf };
+    }
+    function rAt(x) {
+      const k = G.kx, n = k.length;
+      if (x <= k[0][0]) return k[0][1];
+      if (x >= k[n - 1][0]) { const xe = k[n - 1][0], re = k[n - 1][1]; return G.cut ? re * Math.exp(-(x - xe) * 1.6) : 0; }
+      let lo = 0, hi = n - 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (k[m][0] <= x) lo = m; else hi = m; }
+      const a = k[lo], b = k[hi], t = (x - a[0]) / Math.max(1e-9, b[0] - a[0]);
+      return a[1] + t * (b[1] - a[1]);
+    }
+    function yb(x) {
+      if (x <= 0) return 1;
+      const k = 0.9, y = 1 + x * G.tinf + (G.t0 - G.tinf) * k * (1 - Math.exp(-x / k));
+      return Math.max(y, rAt(x) + 0.05, 0.1);
+    }
+    const xmax = () => (W - X0) / S + 0.3;
+    function spawn(p, fresh) {
+      p.f = Math.random();
+      p.x0 = G.Pt[0] + p.f * (G.Pl[0] - G.Pt[0]);
+      p.y0 = G.Pt[1] + p.f * (G.Pl[1] - G.Pt[1]);
+      p.x = fresh ? p.x0 + Math.random() * (xmax() - p.x0) : p.x0 - Math.random() * 0.05;
+      p.seed = Math.random() * 6.283; p.v = 0.85 + Math.random() * 0.35; p.py = null; p.ver = gver;
+    }
+    function posY(p, x) {
+      const r = rAt(x), b = yb(x);
+      let y = r + p.f * (b - r);
+      const w = smooth((x - p.x0) / 0.35);
+      y = p.y0 + (y - p.y0) * w;
+      if (p.f > 0.86) y += Math.sin(x * 6 + time * 4 + p.seed) * 0.05 * Math.min(1.5, Math.max(0, x)) * (p.f - 0.86) * 7;
+      return y;
+    }
+
+    function drawFront() {
+      fx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fx.clearRect(0, 0, W, H);
+      const X = (x) => X0 + x * S;
+      const halves = [(y) => CY - y * S, (y) => CY + y * S];
+      const xL = -X0 / S - 0.2;
+      const K = G.kept.filter((_, i) => i % 4 === 0 || i === G.kept.length - 1);
+      // веер волн разрежения: градиент плотности
+      halves.forEach((Y) => {
+        for (let i = 0; i < K.length - 1; i++) {
+          fx.beginPath(); fx.moveTo(X(G.Pl[0]), Y(G.Pl[1])); fx.lineTo(X(K[i][0]), Y(K[i][1])); fx.lineTo(X(K[i + 1][0]), Y(K[i + 1][1])); fx.closePath();
+          fx.fillStyle = rgba(T.ink, 0.015 + 0.10 * i / K.length); fx.fill();
+        }
+        fx.lineWidth = 1;
+        for (let i = 0; i < K.length; i += 3) {
+          fx.beginPath(); fx.moveTo(X(0), Y(1)); fx.lineTo(X(K[i][0]), Y(K[i][1]));
+          fx.strokeStyle = rgba(T['ink-2'], 0.28); fx.stroke();
+        }
+        if (!G.cut) {
+          const e = G.kept[G.kept.length - 1];
+          fx.beginPath(); fx.moveTo(X(0), Y(1)); fx.lineTo(X(e[0]), Y(e[1]));
+          fx.strokeStyle = rgba(T.signal, 1); fx.lineWidth = 1.5; fx.stroke();
+        }
+        // звуковая линия
+        fx.setLineDash([3, 3]); fx.beginPath(); fx.moveTo(X(G.Pl[0]), Y(G.Pl[1])); fx.lineTo(X(G.Pt[0]), Y(G.Pt[1]));
+        fx.strokeStyle = rgba(T.signal, 1); fx.lineWidth = 1.4; fx.stroke(); fx.setLineDash([]);
+        // граница струи
+        fx.beginPath();
+        for (let x = 0, n = 0; x < xmax(); x += 0.04, n++) { const y = yb(x); if (n) fx.lineTo(X(x), Y(y)); else fx.moveTo(X(x), Y(y)); }
+        fx.setLineDash([6, 5]); fx.strokeStyle = rgba(T['ink-2'], 0.7); fx.lineWidth = 1; fx.stroke(); fx.setLineDash([]);
+        // силуэт центрального тела
+        const plug = [[xL, 0], [xL, G.Pt2[1] - 0.28], [G.Pt2[0] - 0.3, G.Pt2[1] - 0.28], G.Pt2, G.Pt].concat(G.kept.slice(1));
+        if (G.cut) plug.push([G.xcut, 0]);
+        fx.beginPath(); plug.forEach((p, i) => (i ? fx.lineTo(X(p[0]), Y(p[1])) : fx.moveTo(X(p[0]), Y(p[1])))); fx.closePath();
+        fx.fillStyle = rgba(T.ink, 1); fx.fill();
+        // обечайка и камера
+        const top = G.Pl2[1] + 0.22;
+        const cowl = [G.Pl, G.Pl2, [xL, G.Pl2[1]], [xL, top], [G.Pl2[0] + 0.06, top], [0.04, 1.07]];
+        fx.beginPath(); cowl.forEach((p, i) => (i ? fx.lineTo(X(p[0]), Y(p[1])) : fx.moveTo(X(p[0]), Y(p[1])))); fx.closePath(); fx.fill();
+        if (G.cut && G.rest.length > 1) {
+          fx.beginPath(); G.rest.forEach((p, i) => (i ? fx.lineTo(X(p[0]), Y(p[1])) : fx.moveTo(X(p[0]), Y(p[1]))));
+          fx.setLineDash([7, 5]); fx.strokeStyle = rgba(T['ink-2'], 0.8); fx.lineWidth = 1.2; fx.stroke(); fx.setLineDash([]);
+        }
+      });
+      // ось
+      fx.setLineDash([22, 5, 3, 5]); fx.beginPath(); fx.moveTo(0, CY); fx.lineTo(W, CY);
+      fx.strokeStyle = rgba(T['ink-2'], 0.55); fx.lineWidth = 1; fx.stroke(); fx.setLineDash([]);
+      // подписи
+      const label = (s, x, y, col, halo = true) => {
+        fx.font = (halo ? '400' : '500') + ' 12.5px "IBM Plex Mono", ui-monospace, monospace';
+        if (halo) { fx.lineJoin = 'round'; fx.lineWidth = 4; fx.strokeStyle = rgba(T['field-2'], 0.9); fx.strokeText(s, x, y); }
+        fx.fillStyle = col; fx.fillText(s, x, y);
+      };
+      if (!G.cut) {
+        const e = G.kept[G.kept.length - 1], mx = (0 + e[0]) / 2, my = (1 + e[1]) / 2;
+        label('Mₑ', X(mx) + 6, CY - my * S + 16, rgba(T.signal, 1));
+      }
+      const xl = Math.min(2.4, xmax() - 2.2), yl = yb(xl);
+      const sy = CY - yl * S;
+      if (sy > 30 && xl > 0.4) label('граница струи', X(xl) + 8, sy - 8, rgba(T['ink-2'], 1));
+      if (W > 520) label('центральное тело', X(-X0 / S + 0.15), CY + (G.Pt2[1] - 0.6) * S, rgba(T.field, 1), false);
+    }
+
+    function hud() {
+      const reg = regime();
+      $('hud').innerHTML = `<span>ε ${fmt(st.eps, 1)}   γ ${fmt(st.g, 2)}</span><span>p<sub>a</sub>/p<sub>c</sub> ${sci(st.pa)}</span><b>${reg}</b>`;
+    }
+    function regime() {
+      if (st.pa <= 1.6e-5) return 'вакуум';
+      const r = st.pa / G.pe;
+      return r < 0.85 ? 'недорасширение' : r > 1.18 ? 'перерасширение' : 'расчётный режим';
+    }
+    function readouts() {
+      const g = st.g, pe = G.pe, pa = st.pa, eps = st.eps, me = momCF(pe, g);
+      const cfv = me + pe * eps;
+      let bell;
+      if (pe < 0.4 * pa) { const ps = 0.4 * pa, Ms = machFromP(ps, g); bell = momCF(ps, g) + (ps - pa) * area(Ms, g); }
+      else bell = me + (pe - pa) * eps;
+      const aero = pa > pe ? momCF(pa, g) : bell;
+      $('o-me').textContent = fmt(G.c.Me, 2);
+      $('o-nu').textContent = fmt(G.c.nue * 180 / Math.PI, 1) + '°';
+      $('o-l').textContent = st.cut ? fmt(G.xcut, 2) + ' из ' + fmt(G.c.L, 2) : fmt(G.c.L, 2);
+      $('o-cfv').textContent = fmt(cfv, 3);
+      $('o-reg').textContent = regime();
+      const th = G.th0 * 180 / Math.PI;
+      $('o-th').textContent = (th > 0 ? '+' : th < 0 ? '−' : '') + fmt(Math.abs(th), 1) + '°' + (th > 0 ? ' наружу' : th < 0 ? ' к оси' : '');
+      $('o-cfa').textContent = fmt(aero, 3);
+      const gain = (aero / bell - 1) * 100;
+      $('o-cfb').textContent = fmt(bell, 3) + (Math.abs(gain) >= 0.05 ? '  (' + (gain > 0 ? '−' : '+') + fmt(Math.abs(gain), 1) + ' %)' : '');
+      const kpa = pa * 1000;
+      $('pa-o').textContent = sci(pa) + '   ≈ ' + (kpa < 1 ? fmt(kpa, 3) : fmt(kpa, 1)) + ' кПа';
+      $('eps-o').textContent = fmt(st.eps, 1);
+      $('gam-o').textContent = fmt(st.g, 2);
+    }
+
+    function staticStreams() {
+      bx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bx.fillStyle = rgba(T['field-2'], 1); bx.fillRect(0, 0, W, H);
+      bx.lineWidth = 1;
+      for (let f = 0.04; f < 1; f += 0.06) {
+        const p = { f, x0: G.Pt[0] + f * (G.Pl[0] - G.Pt[0]), y0: G.Pt[1] + f * (G.Pl[1] - G.Pt[1]), seed: f * 9 };
+        [-1, 1].forEach((sgn) => {
+          bx.beginPath();
+          for (let x = p.x0, n = 0; x < xmax(); x += 0.03, n++) { const y = posY(p, x), sx = X0 + x * S, sy = CY + sgn * y * S; if (n) bx.lineTo(sx, sy); else bx.moveTo(sx, sy); }
+          bx.strokeStyle = rgba(T.ink, f > 0.86 ? 0.45 : 0.22); bx.stroke();
+        });
+      }
+    }
+
+    function update(redrawBack) {
+      G = geometry(); gver++;
+      drawFront(); readouts(); hud();
+      if (reduce) staticStreams();
+      else if (redrawBack) { bx.setTransform(dpr, 0, 0, dpr, 0, 0); bx.fillStyle = rgba(T['field-2'], 1); bx.fillRect(0, 0, W, H); }
+    }
+
+    function resize() {
+      const r = tunnel.getBoundingClientRect();
+      W = Math.max(1, Math.round(r.width)); H = Math.max(1, Math.round(r.height));
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      [cb, cf].forEach((c) => { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); });
+      S = Math.min(H / 4.6, W / 8.4); X0 = Math.max(W * 0.15, 1.25 * S); CY = H / 2;
+      G = geometry();
+      const n = Math.round(Math.max(260, Math.min(1100, W * H / 700)));
+      parts = []; for (let i = 0; i < n; i++) { const p = {}; spawn(p, true); parts.push(p); }
+      update(true);
+    }
+
+    function frame(ts) {
+      if (!running) return;
+      const dt = Math.min(0.05, last ? (ts - last) / 1000 : 0.016); last = ts; time += dt;
+      bx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bx.fillStyle = rgba(T['field-2'], 0.085); bx.fillRect(0, 0, W, H);
+      bx.lineCap = 'round';
+      const core = new Path2D(), edge = new Path2D();
+      const xm = xmax(), xc = Math.max(0.5, G.xcut);
+      for (const p of parts) {
+        if (p.ver !== gver) { p.py = null; p.ver = gver; }
+        const v = (0.9 + 1.5 * smooth(p.x / xc)) * p.v;
+        p.x += v * dt;
+        if (p.x > xm) { spawn(p, false); continue; }
+        const y = posY(p, p.x), sx = X0 + p.x * S;
+        if (p.py != null) {
+          const path = p.f > 0.86 ? edge : core;
+          path.moveTo(p.psx, CY - p.py * S); path.lineTo(sx, CY - y * S);
+          path.moveTo(p.psx, CY + p.py * S); path.lineTo(sx, CY + y * S);
+        }
+        p.py = y; p.psx = sx;
+      }
+      bx.lineWidth = 1; bx.strokeStyle = rgba(T.ink, 0.42); bx.stroke(core);
+      bx.lineWidth = 1.3; bx.strokeStyle = rgba(T.ink, 0.7); bx.stroke(edge);
+      raf = requestAnimationFrame(frame);
+    }
+    function play() {
+      const want = !reduce && inView && !document.hidden;
+      if (want && !running) { running = true; last = 0; raf = requestAnimationFrame(frame); }
+      else if (!want && running) { running = false; cancelAnimationFrame(raf); }
+    }
+
+    // управление
+    sEps.addEventListener('input', () => { st.eps = epsFromV(+sEps.value); update(false); });
+    sGam.addEventListener('input', () => { st.g = +sGam.value; update(false); });
+    sPa.addEventListener('input', () => { st.pa = paFromV(+sPa.value); update(false); });
+    document.querySelectorAll('input[name=len]').forEach((r) => r.addEventListener('change', () => { st.cut = $('len-cut').checked; update(true); }));
+    // перетаскивание по полю: по горизонтали ε, по вертикали мышью — давление среды
+    let drag = null;
+    if (matchMedia('(pointer: fine)').matches) $('hint').textContent = 'Тяните по полю: влево и вправо — степень расширения, вверх и вниз — давление среды';
+    tunnel.addEventListener('pointerdown', (e) => {
+      drag = { x: e.clientX, y: e.clientY, v: +sEps.value, p: +sPa.value, mouse: e.pointerType === 'mouse', id: e.pointerId };
+      if (drag.mouse) tunnel.setPointerCapture(e.pointerId);
+    });
+    tunnel.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.mouse && Math.abs(dy) > Math.abs(dx) * 1.2 && !drag.locked) { drag = null; return; }
+      drag.locked = true;
+      const nv = Math.max(0, Math.min(1000, drag.v + dx / W * 1400));
+      sEps.value = String(Math.round(nv)); st.eps = epsFromV(nv);
+      if (drag.mouse) { const np = Math.max(0, Math.min(1000, drag.p - dy / H * 1400)); sPa.value = String(Math.round(np)); st.pa = paFromV(np); }
+      update(false);
+    });
+    const end = () => { drag = null; };
+    tunnel.addEventListener('pointerup', end); tunnel.addEventListener('pointercancel', end);
+
+    if ('IntersectionObserver' in window) new IntersectionObserver((es) => { inView = es[0].isIntersecting; play(); }, { threshold: 0.02 }).observe(tunnel);
+    document.addEventListener('visibilitychange', play);
+    if ('ResizeObserver' in window) new ResizeObserver(() => resize()).observe(tunnel); else window.addEventListener('resize', resize);
+    themeHooks.push(() => update(true));
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawFront());
+    resize(); play();
+  })();
+
+  /* ================= ПОЛЕ РЕШЕНИЙ ================= */
+  (() => {
+    const cv = $('sieve-cv'), ctx = cv.getContext('2d');
+    const SW = 576, SH = 648, N = SW * SH;
+    const cls = new Uint8Array(N), rnd = new Uint8Array(N), tone = new Uint8Array(N);
+    const lattice = []; // класс 1 и 2
+    let s = 20261008 >>> 0;
+    for (let r = 0; r < SH; r++) for (let c = 0; c < SW; c++) {
+      const i = r * SW + c;
+      s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+      rnd[i] = s >>> 24; tone[i] = 60 + ((s >>> 9) & 0x7f) + ((s >>> 17) & 0x3f);
+      if (c % 12 === 5 && r % 12 === 7) {
+        const a = (c - 5) / 12, b = (r - 7) / 12, k = (a % 4 === 1 && b % 3 === 1) ? 2 : 1;
+        cls[i] = k;
+        const q = { c, r, k, rnd: rnd[i] };
+        if (k === 2) { const gj = (a - 1) / 4, gi = (b - 1) / 3; q.gx = gj * 48 + 24; q.gy = gi * 36 + 18; }
+        lattice.push(q);
+      }
+    }
+    const img = ctx.createImageData(SW, SH), buf = new Uint32Array(img.data.buffer);
+    const counts = [373248, 2592, 216, 216];
+    const subs = ['сочетаний в поле', 'сочетаний после выбора трёх осей', 'сочетаний прошли правила', 'сочетаний уходят на вторую ступень'];
+    const texts = [
+      '<p>Оси выбора: пара топлив, материал, охлаждение, подача, вариант плуга, смесительная головка, зажигание, разбиение на детали и ориентация печати.</p><p class="muted">Нажмите следующий шаг или подождите — поле отсеется само.</p>',
+      '<p>Выберем АТ+ММГ, охлаждение излучением и кластер модулей. Остальные оси пока свободны, и сочетаний остаётся 2 592.</p>',
+      '<p>Правила первой ступени говорят только «такого не бывает» и не сравнивают чисел. Здесь работают три из пяти:</p><ul><li>у этой пары зажигание только гиперголическое;</li><li>излучающая стенка — только из жаропрочного сплава;</li><li>кластер модулей не бывает одной деталью.</li></ul>',
+      '<p>Каждое из 216 сочетаний получает нижнюю границу стартовой массы: топливо, объём в габарите, баки, насос, баллон наддува. Следующая ступень дороже и точнее и видит только тех, кого пропустила эта.</p>'
+    ];
+    const vis = (stage, k) => stage === 0 ? true : stage === 1 ? k >= 1 : k === 2;
+    let from = 0, to = 0, t = 1, raf = 0, t0 = 0, dur = 1;
+
+    function render() {
+      const e = ease(t), thr = Math.round(e * 255);
+      const ink = T.ink, base = (ink[2] << 16) | (ink[1] << 8) | ink[0];
+      const a0 = vis(from, 0), b0 = vis(to, 0);
+      for (let i = 0; i < N; i++) {
+        if (cls[i]) { buf[i] = 0; continue; }
+        const on = a0 && b0 ? true : a0 ? rnd[i] >= thr : b0 ? rnd[i] < thr : false;
+        buf[i] = on ? ((tone[i] << 24) | base) : 0;
+      }
+      ctx.putImageData(img, 0, 0);
+      const bigF = from >= 1 ? 1 : 0, bigT = to >= 1 ? 1 : 0, big = bigF + (bigT - bigF) * e;
+      const gF = from === 3 ? 1 : 0, gT = to === 3 ? 1 : 0, gat = gF + (gT - gF) * e;
+      ctx.fillStyle = rgba(T.ink, 0.75);
+      for (const q of lattice) {
+        const aon = vis(from, q.k), bon = vis(to, q.k);
+        const on = aon && bon ? true : aon ? q.rnd >= thr : bon ? q.rnd < thr : false;
+        if (!on) continue;
+        if (big < 1) { ctx.globalAlpha = 1 - big; ctx.fillStyle = rgba(T.ink, 0.8); ctx.fillRect(q.c, q.r, 1, 1); }
+        if (big > 0) {
+          ctx.globalAlpha = big; ctx.fillStyle = rgba(T.signal, 1);
+          if (q.k === 2 && gat > 0) {
+            const x = q.c + (q.gx - q.c) * gat, y = q.r + (q.gy - q.r) * gat, rad = 1.6 + 7.4 * gat;
+            ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.2832); ctx.fill();
+          } else ctx.fillRect(q.c - 1, q.r - 1, 3, 3);
+        }
+      }
+      ctx.globalAlpha = 1;
+      $('count').textContent = group(Math.round(counts[from] + (counts[to] - counts[from]) * e));
+    }
+    function step(ts) {
+      if (!t0) t0 = ts;
+      t = Math.min(1, (ts - t0) / dur);
+      render();
+      if (t < 1) raf = requestAnimationFrame(step); else { from = to; raf = 0; }
+    }
+    function go(stage) {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; from = to; }
+      if (stage === to && t >= 1) return;
+      from = to; to = stage; t = 0; t0 = 0;
+      dur = Math.abs(stage - from) > 1 ? 1500 : (stage === 3 || from === 3 ? 1500 : 1300);
+      document.querySelectorAll('#steps button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.s === stage)));
+      $('stage-text').innerHTML = texts[stage];
+      $('count-sub').textContent = subs[stage];
+      if (reduce) { t = 1; render(); from = to; } else raf = requestAnimationFrame(step);
+    }
+    let touched = false, timers = [];
+    document.querySelectorAll('#steps button').forEach((b) => b.addEventListener('click', () => { touched = true; timers.forEach(clearTimeout); go(+b.dataset.s); }));
+    $('steps').addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault(); touched = true; timers.forEach(clearTimeout);
+      const n = Math.max(0, Math.min(3, to + (e.key === 'ArrowDown' ? 1 : -1)));
+      go(n); document.querySelector(`#steps button[data-s="${n}"]`).focus();
+    });
+    $('stage-text').innerHTML = texts[0];
+    render();
+    if (!reduce && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((es) => {
+        if (!es[0].isIntersecting || touched) return;
+        io.disconnect();
+        timers.push(setTimeout(() => !touched && go(1), 900));
+        timers.push(setTimeout(() => !touched && go(2), 3600));
+        timers.push(setTimeout(() => !touched && go(3), 6400));
+      }, { threshold: 0.45 });
+      io.observe(cv);
+    }
+    themeHooks.push(render);
+  })();
+
+  /* ================= ГРАНИЦА ================= */
+  (() => {
+    const svg = $('bsvg'), NS = 'http://www.w3.org/2000/svg';
+    // [нижняя граница, оценка, настоящая масса] — условные числа для схемы
+    const rows = [[22, 47, 49], [26, 45, 53], [30, 55, 42], [35, 52, 58], [41, 60, 63], [44, 58, 47], [47, 49, 66], [52, 68, 71], [56, 62, 74], [61, 79, 80], [66, 70, 85], [72, 88, 90]];
+    const best = rows.reduce((m, r, i) => (r[2] < rows[m][2] ? i : m), 0);
+    const X = (m) => 64 + m * 5.5, Y = (i) => 22 + i * 28;
+    const el = (tag, a, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (p || svg).appendChild(e); return e; };
+    const gs = rows.map((r, i) => {
+      const g = el('g', { class: 'row' });
+      const y = Y(i);
+      el('text', { x: 8, y: y + 4 }, g).textContent = 'В' + (i + 1);
+      el('line', { class: 'rail', x1: X(0), x2: X(100), y1: y, y2: y }, g);
+      el('line', { class: 'span', x1: X(r[0]), x2: X(r[2]), y1: y, y2: y }, g);
+      el('rect', { class: 'bnd', x: X(r[0]) - 1.5, y: y - 7, width: 3, height: 14 }, g);
+      el('circle', { class: 'tru', cx: X(r[2]), cy: y, r: 4.5 }, g);
+      const eg = el('g', { class: 'est-g' }, g);
+      el('path', { class: 'est', d: `M${X(r[1])} ${y - 6} L${X(r[1]) + 6} ${y} L${X(r[1])} ${y + 6} L${X(r[1]) - 6} ${y} Z` }, eg);
+      const note = el('text', { x: X(100) + 6, y: y + 4 }, g);
+      return { g, eg, note };
+    });
+    const ay = Y(rows.length - 1) + 24;
+    el('line', { class: 'axis', x1: X(0), x2: X(100), y1: ay, y2: ay });
+    for (let m = 0; m <= 100; m += 20) {
+      el('line', { class: 'axis', x1: X(m), x2: X(m), y1: ay, y2: ay + 5 });
+      el('text', { x: X(m), y: ay + 19, 'text-anchor': 'middle' }).textContent = m;
+    }
+    el('text', { x: X(100), y: ay + 36, 'text-anchor': 'end' }).textContent = 'стартовая масса m₀, условные единицы';
+    const incL = el('line', { class: 'inc', y1: 6, y2: ay });
+    const incH = el('rect', { class: 'inc-h', y: 2, width: 14, height: 10, rx: 2 });
+    const incT = el('text', { class: 'inc-t', y: 11 });
+    // ширина под подписи справа
+    svg.setAttribute('viewBox', `0 0 ${X(100) + 26} ${ay + 44}`);
+
+    const rng = $('inc-r');
+    let inc = 50;
+    function draw() {
+      const est = $('bm-e').checked;
+      incL.setAttribute('x1', X(inc)); incL.setAttribute('x2', X(inc));
+      incH.setAttribute('x', X(inc) - 7);
+      const right = inc > 70;
+      incT.setAttribute('x', X(inc) + (right ? -12 : 12)); incT.setAttribute('text-anchor', right ? 'end' : 'start');
+      incT.textContent = 'рекорд ' + inc;
+      let cut = 0, lostBest = false, lostGood = 0;
+      rows.forEach((r, i) => {
+        const key = est ? r[1] : r[0], dropped = key > inc;
+        const { g, eg, note } = gs[i];
+        g.classList.toggle('cut', dropped && !(i === best));
+        g.classList.toggle('best', i === best && !dropped);
+        g.classList.toggle('lost', i === best && dropped);
+        eg.style.opacity = est ? 1 : 0;
+        note.textContent = i === best ? (dropped ? '✕' : '') : '';
+        if (dropped) { cut++; if (r[2] < inc) lostGood++; if (i === best) lostBest = true; }
+      });
+      const v = $('verdict');
+      $('inc-o').textContent = inc;
+      if (lostBest) {
+        v.className = 'verdict bad';
+        v.textContent = `Отсеяно ${cut} из ${rows.length}. Выброшен лучший вариант В${best + 1}: его оценка ${rows[best][1]} выше рекорда, а настоящая масса ${rows[best][2]} — ниже.`;
+      } else {
+        v.className = 'verdict';
+        v.textContent = `Отсеяно ${cut} из ${rows.length}. Лучший вариант В${best + 1} на месте` + (est && lostGood ? `, но потеряно ${lostGood} годных.` : ': ни одна граница не выше настоящей массы.');
+      }
+    }
+    function setInc(m) { inc = Math.round(Math.max(42, Math.min(95, m))); rng.value = String(inc); draw(); }
+    rng.addEventListener('input', () => setInc(+rng.value));
+    document.querySelectorAll('input[name=bm]').forEach((r) => r.addEventListener('change', draw));
+    let dragging = false;
+    const toMass = (e) => { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const p = pt.matrixTransform(svg.getScreenCTM().inverse()); return (p.x - 64) / 5.5; };
+    svg.addEventListener('pointerdown', (e) => { dragging = true; if (e.pointerType === 'mouse') svg.setPointerCapture(e.pointerId); setInc(toMass(e)); });
+    svg.addEventListener('pointermove', (e) => { if (dragging) setInc(toMass(e)); });
+    const stop = () => { dragging = false; };
+    svg.addEventListener('pointerup', stop); svg.addEventListener('pointercancel', stop);
+    draw();
+  })();
+
+  /* ================= ПЕЧАТЬ СЛОЯМИ ================= */
+  (() => {
+    const L = [
+      { k: 1, p: 'Cem.Quantities', t: 'Типы физических величин', s: 'принят', d: 'Каждая физическая величина — собственный тип в СИ, неявного приведения к числу нет. Оператор определён, только если он осмыслен.' },
+      { k: 2, p: 'Cem.Contracts', t: 'Требование, сигналы, Outcome', s: 'принят', d: 'Общий язык слоёв. Штатный отказ — нет каталожного элемента, решатель не сошёлся — возвращается поиску результатом, а не исключением.' },
+      { k: 3, p: 'Cem.Physics', t: 'Изэнтропа, сопло, Прандтль—Майер', s: 'принят', d: 'Только чистые функции: изэнтропа, идеальное сопло, течение Прандтля—Майера, кольцевое горло, распространение полос. Те же соотношения рисуют плуг вверху страницы.' },
+      { k: 4, p: 'Cem.Discrete', t: 'Девять осей и правила совместимости', s: 'принят после правок', n: 771, d: 'Распространение ограничений с дуговой согласованностью и топология установки. Это первая ступень лестницы отсева.' },
+      { k: 5, p: 'Cem.Data', t: 'Датумы с цитатами, материалы, L-PBF', s: 'принят', n: 943, d: 'У каждого числа — документ, место и ссылка; дыра в данных остаётся дырой. Справочник не экстраполирует: вне области данных — сигнал, а не число.' },
+      { k: 6, p: 'Cem.Data', t: 'Термохимия четырёх пар, NASA CEA', s: 'принят 27.09', n: 1024, d: 'Таблицы четырёх пар топлив по давлению и соотношению компонентов и контракт интерполяции.' },
+      { k: 7, p: 'Cem.Screening', t: 'Граница топлива', s: 'принят 29.09', n: 1114, d: 'Начало второй ступени: m₀ ≥ I_Σ / c_max. Граница сверена с замороженным Ivac NASA CEA на 927 255 сравнениях, нарушений ноль.' },
+      { k: 8, p: 'Cem.Screening', t: 'Плотности компонентов и объём в габарите', s: 'принят 29.09', n: 1196, d: 'Отсев по объёму: топливо обязано поместиться в заданный конверт установки.' },
+      { k: 9, p: 'Cem.Screening', t: 'Давление в камере, баки', s: 'принят 29.09', n: 1312, d: 'Давление в камере стало переменной. Масса баков — по теореме о вириале, поэтому граница не зависит от формы оболочки.' },
+      { k: 10, p: 'Cem.Screening', t: 'Электронасосная подача', s: 'принят 01.10', n: 1402, d: 'Граница электронасоса по удельной мощности батареи и привода. На семействе E11 из 154 035 сравнений нарушений ноль, ближе всего 0,976.' },
+      { k: 11, p: 'Cem.Screening', t: 'Баллон наддува', s: 'принят 04.10', n: 1412, d: 'Цена давления для вытеснительной подачи с баллоном. Семейство E12: 864 выбора, ближе всего граница подошла к массе на 0,981.' },
+      { k: 12, p: 'Cem.Screening', t: 'Каталог сосудов, композитный баллон', s: 'принят 07.10', n: 1459, d: 'Композитный баллон из ламината IM7/8552 по данным квалификации NCAMP. Принят с первого круга; 1152 выбора семейства E13 сверены с прототипом, ближе всего граница подошла к массе на 0,977. Отношение ниже, чем у E12, потому что COPV расширил пространство конструкций и граница обязана пройти и под более лёгкими.' },
+      { k: 13, p: 'Cem.Screening', t: 'Потолок мощности электронасоса', s: 'бриф готов 08.10', active: true, d: 'Цена давления растёт с давлением, когда насосу не хватает мощности бортовой сети: доля напора θ = min(1; N_max/(P·q)). При N_max → ∞ граница побайтово равна части 2c. Свойство проверено на 455 700 станциях трёх семейств при каждом потолке, нарушений ноль. Бриф прошёл два прохода проверки субагентом и ждёт коммита — этот слой сейчас и сплавляется.' },
+      { k: '', p: 'Cem.Screening', t: 'Газогенераторный насос', s: 'нужны данные', future: true, d: 'Нужна термохимия газогенератора при ограниченной температуре турбины.' },
+      { k: '', p: 'Cem.Solver', t: 'Связанный сайзинг', s: 'запланировано', future: true, d: 'Третья ступень: тепло, прочность и гидравлика по станциям выработки. Каждое ограничение помнит станцию, на которой оно связало.' },
+      { k: '', p: 'Cem.Geometry', t: 'Печатаемая геометрия на PicoGK', s: 'запланировано', future: true, d: 'Четвёртая ступень, только для финалистов. Минимальная стенка обеспечивается самим построением, а не проверкой после него.' },
+      { k: '', p: 'ВКР', t: 'Выпускная работа', s: 'запланировано', future: true, d: 'Утверждение темы с руководителем, текст работы, защита.' }
+    ];
+    const stack = $('stack');
+    const btns = [];
+    L.slice().reverse().forEach((l, ri) => {
+      const idx = L.length - 1 - ri;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'layer' + (l.future ? ' future' : l.active ? ' active' : ' done');
+      b.style.setProperty('--ang', ((idx * 67) % 180) + 'deg');
+      b.style.setProperty('--i', String(idx));
+      b.setAttribute('aria-pressed', 'false');
+      b.innerHTML = `<span class="k">${l.k}</span><span class="slab">${l.active ? '<span class="laser"></span>' : ''}</span>` +
+        `<span class="t">${l.t}<small>${l.p}</small></span><span class="c">${l.n ? l.n : l.active ? '…' : ''}</span>`;
+      const sel = () => select(idx);
+      b.addEventListener('click', sel); b.addEventListener('mouseenter', sel); b.addEventListener('focus', sel);
+      stack.appendChild(b); btns[idx] = b;
+    });
+    function select(i) {
+      const l = L[i];
+      btns.forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+      $('p-meta').innerHTML = `<span>${l.k ? 'инкремент ' + l.k : 'дальше'}</span><span>${l.p}</span><span class="state">${l.s}</span>` + (l.n ? `<span>${l.n} тестов</span>` : '');
+      $('p-title').textContent = l.t;
+      $('p-text').textContent = l.d;
+    }
+    select(12);
+    if (!reduce && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) { stack.classList.add('fusing'); io.disconnect(); } }, { threshold: 0.3 });
+      io.observe(stack);
+    }
+  })();
+})();
+</script>
+
+</body></html>
